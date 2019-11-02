@@ -1,0 +1,10 @@
+<!--
+  Launch trashbot AI and relevant nodes
+-->
+
+<launch>
+
+  <!-- Trashbot AI node -->
+  <node name="trashbot_ai" pkg="trashbot_ai" type="test_navigator.py" output="screen"/>
+
+</launch>
