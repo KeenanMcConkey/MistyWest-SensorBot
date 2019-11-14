@@ -27,29 +27,24 @@ class Navigator:
 
         rospy.init_node('navigator', anonymous=True)
         rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle)
+        #self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
         self.send_vel_message()
-            
+    
     # Navigate to the nearest bottle
     def navigate_bottle(self, data):
         # Navigate to first bottle
         boxes =  list(filter(lambda x: x.Class == "bottle", data.bounding_boxes))
         if boxes:
             box = boxes[0]
-            #print("See bottle in x range = {}-{}".format(box.xmin, box.xmax))
+            print("See bottle in x range = {}-{}".format(box.xmin, box.xmax))
             xpos = (box.xmax + box.xmin)/2 - 320
-            print("xpos {}".format(xpos))
-
+            
             if xpos > -100 and xpos < 100:
 	        # Go forward
-                self.set_vel(0.0, 2.0)
+                self.set_vel(0.0, 1.0)
             else:
                 # Rotate 
-                turn = -xpos / 320.0 * 2.0
-                print("turn {}".format(turn))
-                #if turn > 2:
-                #    turn = 2
-                #elif turn < -2:
-                #    turn = -2
+                turn = -xpos / 320 * 2.0
                 #turn = -(abs(xpos)/xpos) * 1.5
                 self.set_vel(turn, 0.0)
         else:

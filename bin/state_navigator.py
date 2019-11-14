@@ -28,7 +28,8 @@ class Navigator:
         rospy.init_node('navigator', anonymous=True)
         rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle)
         self.send_vel_message()
-            
+    def navigate_random(self):
+        pass
     # Navigate to the nearest bottle
     def navigate_bottle(self, data):
         # Navigate to first bottle
