@@ -6,7 +6,13 @@ import rospy
 from geometry_msgs.msg import Twist
 from darknet_ros_msgs.msg import BoundingBoxes
 
+
 class Navigator:
+    FORWARD_THRESHOLD = 75
+    IMAGE_HEIGHT = 480
+    IMAGE_WIDTH = 640
+    PROPORTIONAL = 2.0
+    MINIUMUM_TURN = 1.5
     """
     Navigator class for trash bot
     """
@@ -36,15 +42,16 @@ class Navigator:
         if boxes:
             box = boxes[0]
             #print("See bottle in x range = {}-{}".format(box.xmin, box.xmax))
-            xpos = (box.xmax + box.xmin)/2 - 320
+            xpos = (box.xmax + box.xmin)/2 - self.IMAGE_WIDTH/2
             print("xpos {}".format(xpos))
 
-            if xpos > -100 and xpos < 100:
+            if xpos > -self.FORWARD_THRESHOLD and xpos < self.FORWARD_THRESHOLD:
 	        # Go forward
                 self.set_vel(0.0, 2.0)
             else:
                 # Rotate 
-                turn = -xpos / 320.0 * 2.0
+                turn = -xpos / (self.IMAGE_WIDTH/2) * self.PROPORTIONAL
+                turn = turn if abs(turn) > self.MINIUMUM_TURN else self.MINIUMUM_TURN
                 print("turn {}".format(turn))
                 #if turn > 2:
                 #    turn = 2
