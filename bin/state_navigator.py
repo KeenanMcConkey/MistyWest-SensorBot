@@ -4,7 +4,7 @@ from __future__ import print_function
 import roslib
 import rospy
 from std_msgs.msg import Int8
-from std_msgs.msg import UInt16s
+from std_msgs.msg import UInt16
 from geometry_msgs.msg import Twist
 from darknet_ros_msgs.msg import BoundingBoxes
 
