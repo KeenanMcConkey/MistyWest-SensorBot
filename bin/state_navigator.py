@@ -32,7 +32,7 @@ class TrashBot:
 
     def __init__(self):
         # Track current state of the robot
-        self.robot_state = STATE_FIND_BOTTLE
+        self.robot_state = self.STATE_FIND_BOTTLE
 
         # Velocity message, sent to /cmd_vel at fixed rate
         self.vel = Twist()
@@ -65,7 +65,7 @@ class TrashBot:
     def stop(self):
         self.set_vel(0.0, 0.0)
 
-        while self.robot_state is STATE_STOP and not rospy.is_shutdown():
+        while self.robot_state is self.STATE_STOP and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
             self.vel_rate.sleep()
 
@@ -73,7 +73,7 @@ class TrashBot:
         self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
         self.set_vel(0.0, MINIUMUM_TURN)
 
-        while self.robot_state is STATE_FIND_BOTTLE and not rospy.is_shutdown():
+        while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
             self.vel_rate.sleep()
 
@@ -84,12 +84,12 @@ class TrashBot:
     def find_bottle_callback(self, data):
         boxes =  list(filter(lambda x: x.Class == "bottle", data.bounding_boxes))
         if boxes:
-            self.robot_state = STATE_NAV_BOTTLE
+            self.robot_state = self.STATE_NAV_BOTTLE
 
     def navigate_bottle(self):
         self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
 
-        while self.robot_state is STATE_NAV_BOTTLE and not rospy.is_shutdown():
+        while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
             self.vel_rate.sleep()
 
@@ -105,7 +105,7 @@ class TrashBot:
             size = box.xmax - box.xmin
             print("size {}".format(size))
             if size > 200:
-                self.robot_state = STATE_PICKUP_BOTTLE
+                self.robot_state = self.STATE_PICKUP_BOTTLE
 
             # Determine bottle position relative to 0
             xpos = (box.xmax + box.xmin)/2 - self.IMAGE_WIDTH/2
@@ -150,19 +150,19 @@ if __name__ == '__main__':
         bot.state_pub.publish(bot.robot_state)
 
         # State machine
-        if bot.robot_state == STATE_STOP:
+        if bot.robot_state == self.STATE_STOP:
             bot.stop()
-        elif bot.robot_state == STATE_FIND_BOTTLE:
+        elif bot.robot_state == self.STATE_FIND_BOTTLE:
             bot.find_bottle()
-        elif bot.robot_state == STATE_NAV_BOTTLE:
+        elif bot.robot_state == self.STATE_NAV_BOTTLE:
             bot.navigate_bottle()
-        elif bot.robot_state == STATE_PICKUP_BOTTLE:
+        elif bot.robot_state == self.STATE_PICKUP_BOTTLE:
             bot.pickup_bottle()
-        elif bot.robot_state == STATE_FIND_QR:
+        elif bot.robot_state == self.STATE_FIND_QR:
             bot.find_qr()
-        elif bot.robot_state == STATE_NAV_QR:
+        elif bot.robot_state == self.STATE_NAV_QR:
             bot.navigate_qr()
-        elif bot.robot_state == STATE_DROPOFF_BOTTLE:
+        elif bot.robot_state == self.STATE_DROPOFF_BOTTLE:
             bot.dropoff_bottle()
         else:
             bot.stop()
