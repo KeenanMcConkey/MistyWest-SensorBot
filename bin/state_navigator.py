@@ -31,10 +31,10 @@ class TrashBot:
     STATE_DROPOFF_BOTTLE = 6
 
     def __init__(self):
-        # Track current state of the robot
+        # Initially search for a bottle
         self.robot_state = self.STATE_FIND_BOTTLE
 
-        # Velocity message, sent to /cmd_vel at fixed rate
+        # Velocity message, sent to /cmd_vel at VEL_PUBLISH_RATE
         self.vel = Twist()
         self.vel.linear.x = 0.0
         self.vel.linear.y = 0.0
@@ -44,18 +44,17 @@ class TrashBot:
         self.vel.angular.z = 0.0
 
         print("="*50)
-        print("= Initialize Trashbot Navigator")
+        print("= Initialize TrashBot")
         print("="*50)
-        print("Waiting for bottle bounding box")
 
         # Initialize this node
         rospy.init_node('Navigator', anonymous=True)
 
         # Published topics
-        self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = QUEUE_SIZE)
-        self.servo1_pub = rospy.Publisher("/servo1", UInt16, queue_size = QUEUE_SIZE)
-        self.servo2_pub = rospy.Publisher("/servo2", Twist, queue_size = QUEUE_SIZE)
-        self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = QUEUE_SIZE)
+        self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = self.QUEUE_SIZE)
+        self.servo1_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
+        self.servo2_pub = rospy.Publisher("/servo2", Twist, queue_size = self.QUEUE_SIZE)
+        self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
         self.vel_rate = rospy.Rate(VEL_PUBLISH_RATE)
         self.servo_rate = rospy.Rate(SERVO_PUBLISH_RATE)
 
@@ -71,7 +70,7 @@ class TrashBot:
 
     def find_bottle(self):
         self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
-        self.set_vel(0.0, MINIUMUM_TURN)
+        self.set_vel(0.0, self.MINIUMUM_TURN)
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
@@ -96,9 +95,9 @@ class TrashBot:
         self.box_sub.shutdown()
 
     def navigate_bottle_callback(self, data):
-        # Navigate to first bottle seen
         boxes =  list(filter(lambda x: x.Class == "bottle", data.bounding_boxes))
         if boxes:
+            # Navigate to first bottle seen
             box = boxes[0]
 
             # Determine size of bottle
@@ -131,25 +130,23 @@ class TrashBot:
         self.servo1_pub.publish(90)
         self.servo2_pub.pubish(90)
 
-    # Set velocity
+    ### Functions to be written ###
+    #def find_qr(self):
+    #def find_qr_callback(self, data):
+    #def navigate_qr(self):
+    #def navigate_qr_callback(self, data):
+    #def dropoff_bottle(self):
+
+    # Set turn velocity and forward velocity i.e. Z Gyro and X Velocity
     def set_vel(self, turn, forward):
         self.vel.angular.z = turn
         self.vel.linear.x = forward
-
-    # Publish to cmd_vel topic
-    #def send_vel_message(self):
-    #    vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = QUEUE_SIZE)
-    #    r = rospy.Rate(PUBLISH_RATE)
-    #    while not rospy.is_shutdown():
-    #        vel_pub.publish(self.vel)
-    #        r.sleep()
 
 if __name__ == '__main__':
     try:
         bot = TrashBot()
         bot.state_pub.publish(bot.robot_state)
 
-        # State machine
         if bot.robot_state == self.STATE_STOP:
             bot.stop()
         elif bot.robot_state == self.STATE_FIND_BOTTLE:
