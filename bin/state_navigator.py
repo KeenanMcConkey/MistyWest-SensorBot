@@ -53,13 +53,13 @@ class TrashBot:
         # Published topics
         self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = self.QUEUE_SIZE)
         self.servo1_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
-        self.servo2_pub = rospy.Publisher("/servo2", Twist, queue_size = self.QUEUE_SIZE)
+        self.servo2_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
         self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
-        self.vel_rate = rospy.Rate(VEL_PUBLISH_RATE)
-        self.servo_rate = rospy.Rate(SERVO_PUBLISH_RATE)
+        self.vel_rate = rospy.Rate(self.VEL_PUBLISH_RATE)
+        self.servo_rate = rospy.Rate(self.SERVO_PUBLISH_RATE)
 
         # Subscribed topics
-        self.box_sub = rospy.Subscriber()
+        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
 
     def stop(self):
         self.set_vel(0.0, 0.0)
@@ -76,7 +76,7 @@ class TrashBot:
             self.vel_pub.publish(self.vel)
             self.vel_rate.sleep()
 
-        self.box_sub.shutdown()
+        self.box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
 
@@ -92,7 +92,7 @@ class TrashBot:
             self.vel_pub.publish(self.vel)
             self.vel_rate.sleep()
 
-        self.box_sub.shutdown()
+        self.box_sub.unregister()
 
     def navigate_bottle_callback(self, data):
         boxes =  list(filter(lambda x: x.Class == "bottle", data.bounding_boxes))
@@ -112,7 +112,7 @@ class TrashBot:
             print("xpos {}".format(xpos))
 
             # Go forward
-            if abs(self) < self.FORWARD_THRESHOLD:
+            if abs(xpos) < self.FORWARD_THRESHOLD:
                 self.set_vel(0.0, 2.0)
             # Rotate
             else:
@@ -128,7 +128,7 @@ class TrashBot:
         self.vel_pub.publish(self.vel)
 
         self.servo1_pub.publish(90)
-        self.servo2_pub.pubish(90)
+        self.servo2_pub.publish(90)
 
     ### Functions to be written ###
     #def find_qr(self):
@@ -145,24 +145,26 @@ class TrashBot:
 if __name__ == '__main__':
     try:
         bot = TrashBot()
-        bot.state_pub.publish(bot.robot_state)
+        
+        while not rospy.is_shutdown():
+            bot.state_pub.publish(bot.robot_state)
 
-        if bot.robot_state == self.STATE_STOP:
-            bot.stop()
-        elif bot.robot_state == self.STATE_FIND_BOTTLE:
-            bot.find_bottle()
-        elif bot.robot_state == self.STATE_NAV_BOTTLE:
-            bot.navigate_bottle()
-        elif bot.robot_state == self.STATE_PICKUP_BOTTLE:
-            bot.pickup_bottle()
-        elif bot.robot_state == self.STATE_FIND_QR:
-            bot.find_qr()
-        elif bot.robot_state == self.STATE_NAV_QR:
-            bot.navigate_qr()
-        elif bot.robot_state == self.STATE_DROPOFF_BOTTLE:
-            bot.dropoff_bottle()
-        else:
-            bot.stop()
+            if bot.robot_state == bot.STATE_STOP:
+               bot.stop()
+            elif bot.robot_state == bot.STATE_FIND_BOTTLE:
+               bot.find_bottle()
+            elif bot.robot_state == bot.STATE_NAV_BOTTLE:
+               bot.navigate_bottle()
+            elif bot.robot_state == bot.STATE_PICKUP_BOTTLE:
+                bot.pickup_bottle()
+            elif bot.robot_state == bot.STATE_FIND_QR:
+                bot.find_qr()
+            elif bot.robot_state == bot.STATE_NAV_QR:
+                bot.navigate_qr()
+            elif bot.robot_state == bot.STATE_DROPOFF_BOTTLE:
+                bot.dropoff_bottle()
+            else:
+                bot.stop()
 
     except rospy.ROSInterruptException:
         pass
