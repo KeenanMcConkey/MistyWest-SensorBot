@@ -22,6 +22,7 @@ class TrashBot:
     SERVO_PUBLISH_RATE = 1
     QUEUE_SIZE = 10
 
+    # State types
     STATE_STOP = 0
     STATE_FIND_BOTTLE = 1
     STATE_NAV_BOTTLE = 2
@@ -29,6 +30,7 @@ class TrashBot:
     STATE_FIND_QR = 4
     STATE_NAV_QR = 5
     STATE_DROPOFF_BOTTLE = 6
+    state_dict = {0: "STATE_STOP", 1}
 
     def __init__(self):
         # Initially search for a bottle
@@ -57,9 +59,6 @@ class TrashBot:
         self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
         self.vel_rate = rospy.Rate(self.VEL_PUBLISH_RATE)
         self.servo_rate = rospy.Rate(self.SERVO_PUBLISH_RATE)
-
-        # Subscribed topics
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
 
     def stop(self):
         self.set_vel(0.0, 0.0)
@@ -145,7 +144,7 @@ class TrashBot:
 if __name__ == '__main__':
     try:
         bot = TrashBot()
-        
+
         while not rospy.is_shutdown():
             bot.state_pub.publish(bot.robot_state)
 
