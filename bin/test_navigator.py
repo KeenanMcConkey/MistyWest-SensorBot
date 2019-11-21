@@ -4,8 +4,7 @@ from __future__ import print_function
 import roslib
 import rospy
 from geometry_msgs.msg import Twist
-from darknet_ros_msgs.msg import BoundingBoxes
-
+from darknet_ros_msgs.msg import BoundingBox
 
 class Navigator:
     FORWARD_THRESHOLD = 75
@@ -32,35 +31,28 @@ class Navigator:
         print("Waiting for bottle bounding box")
 
         rospy.init_node('navigator', anonymous=True)
-        rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle)
+        rospy.Subscriber('/object_tracker/bounding_box', BoundingBox, self.navigate_bottle)
         self.send_vel_message()
             
     # Navigate to the nearest bottle
     def navigate_bottle(self, data):
         # Navigate to first bottle
-        boxes =  list(filter(lambda x: x.Class == "bottle", data.bounding_boxes))
-        if boxes:
-            box = boxes[0]
-            #print("See bottle in x range = {}-{}".format(box.xmin, box.xmax))
-            xpos = (box.xmax + box.xmin)/2 - self.IMAGE_WIDTH/2
-            print("xpos {}".format(xpos))
+        box = data
+        # Determine bottle position relative to 0
+        xpos = (box.xmax + box.xmin)/2 - self.IMAGE_WIDTH/2
+        #print("See bottle in x range = {}-{}".format(box.xmin, box.xmax))
+        print("xpos {}".format(xpos))
 
-            if xpos > -self.FORWARD_THRESHOLD and xpos < self.FORWARD_THRESHOLD:
-	        # Go forward
-                self.set_vel(0.0, 2.0)
-            else:
-                # Rotate 
-                turn = -xpos / (self.IMAGE_WIDTH/2) * self.PROPORTIONAL
-                turn = turn if abs(turn) > self.MINIUMUM_TURN else self.MINIUMUM_TURN
-                print("turn {}".format(turn))
-                #if turn > 2:
-                #    turn = 2
-                #elif turn < -2:
-                #    turn = -2
-                #turn = -(abs(xpos)/xpos) * 1.5
-                self.set_vel(turn, 0.0)
+        # Go forward
+        if abs(xpos) < self.FORWARD_THRESHOLD:
+            self.set_vel(0.0, 2.0)
+        # Rotate
         else:
-            self.set_vel(0.0, 0.0)
+            turn = -xpos / (self.IMAGE_WIDTH/2) * self.PROPORTIONAL
+            turn = turn if abs(turn) > self.MINIUMUM_TURN else self.MINIUMUM_TURN
+            print("turn {}".format(turn))
+            self.set_vel(turn, 0.0)
+
 
     # Set velocity
     def set_vel(self, turn, forward):

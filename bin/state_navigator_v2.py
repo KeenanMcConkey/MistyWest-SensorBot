@@ -2,7 +2,8 @@
 from __future__ import print_function
 
 import roslib
-import rospy
+import rospy 
+import math
 from std_msgs.msg import Int8
 from std_msgs.msg import UInt16
 from geometry_msgs.msg import Twist
@@ -14,6 +15,7 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 50
+    GRAB_SIZE_THRESHOLD = 265
     IMAGE_HEIGHT = 480
     IMAGE_WIDTH = 640
     PROPORTIONAL = 2.0
@@ -75,7 +77,7 @@ class TrashBot:
     '''
     def find_bottle(self):
         self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
-        self.set_vel(0.0, self.MINIUMUM_TURN)
+        self.set_vel(self.MINIUMUM_TURN, 0.0)
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
@@ -122,7 +124,7 @@ class TrashBot:
             # Determine size of bottle
             size = box.xmax - box.xmin
             print("Bottle Size = {}".format(size))
-            if size > 200:
+            if size > self.GRAB_SIZE_THRESHOLD:
                 self.robot_state = self.STATE_PICKUP_BOTTLE
 
             # Determine bottle position relative to 0
@@ -135,7 +137,7 @@ class TrashBot:
             # Rotate in place
             else:
                 turn = -xpos / (self.IMAGE_WIDTH/2) * self.PROPORTIONAL
-                turn = turn if abs(turn) > self.MINIUMUM_TURN else self.MINIUMUM_TURN
+                turn = turn if abs(turn) > self.MINIUMUM_TURN else math.copysign(self.MINIUMUM_TURN, turn)
                 print("Robot Turn Speed = {}".format(turn))
                 self.set_vel(turn, 0.0)
         else:

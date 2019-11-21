@@ -6,6 +6,9 @@
 
   <!-- Trashbot AI node -->
   <node name="trashbot_ai" pkg="trashbot_ai" type="test_navigator.py" output="screen"/>
+  
+  <!-- Object tracker node -->
+  <node name="object_tracker" pkg="object_tracker" type="object_tracker_v2.py" output="screen"/>
 
   <!-- ROS Serial node to communicate with Motor control arduino -->
   <node pkg="rosserial_python" type="serial_node.py" name="serial_node">

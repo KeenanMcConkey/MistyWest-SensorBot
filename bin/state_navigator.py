@@ -30,7 +30,6 @@ class TrashBot:
     STATE_FIND_QR = 4
     STATE_NAV_QR = 5
     STATE_DROPOFF_BOTTLE = 6
-    state_dict = {0: "STATE_STOP", 1}
 
     def __init__(self):
         # Initially search for a bottle

@@ -5,7 +5,7 @@
 <launch>
 
   <!-- Trashbot AI node -->
-  <node name="trashbot_ai" pkg="trashbot_ai" type="state_navigator.py" output="screen"/>
+  <node name="trashbot_ai" pkg="trashbot_ai" type="state_navigator_v2.py" output="screen"/>
 
   <!-- ROS Serial node to communicate with Motor control arduino -->
   <node pkg="rosserial_python" type="serial_node.py" name="serial_node">
