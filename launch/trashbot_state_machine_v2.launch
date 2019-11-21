@@ -23,6 +23,9 @@
     <param name="io_method" value="mmap"/>
   </node>
 
+  <!-- Trashbot AI node -->
+  <node name="object_tracker" pkg="object_tracker" type="object_tracker_v2.py" output="screen"/>
+
   <!-- Darknet node -->
   <!-- include file="$(find darknet_ros)/launch/yolo_v3.launch"/-->
 
