@@ -24,9 +24,9 @@
   </node>
 
   <!-- Trashbot AI node -->
-  <node name="object_tracker" pkg="object_tracker" type="object_tracker_v2.py" output="screen"/>
+  <node name="object_tracker" pkg="object_tracker" type="object_tracker_v3.py" output="screen"/>
 
   <!-- Darknet node -->
-  <!-- include file="$(find darknet_ros)/launch/yolo_v3.launch"/-->
+  <include file="$(find darknet_ros)/launch/yolo_v3.launch"/>
 
 </launch>

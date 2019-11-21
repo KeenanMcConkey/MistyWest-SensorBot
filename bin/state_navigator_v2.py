@@ -76,7 +76,7 @@ class TrashBot:
     Rotate in place until a bottle is seen, then centre it in the robots camera
     '''
     def find_bottle(self):
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
+        self.box_sub = rospy.Subscriber('/object_tracker/bounding_box', BoundingBox, self.find_bottle_callback)
         self.set_vel(self.MINIUMUM_TURN, 0.0)
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
@@ -103,7 +103,7 @@ class TrashBot:
     be picked up
     '''
     def navigate_bottle(self):
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
+        self.box_sub = rospy.Subscriber('/object_tracker/bounding_box', BoundingBox, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
