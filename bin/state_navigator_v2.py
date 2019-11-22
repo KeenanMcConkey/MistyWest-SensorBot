@@ -184,6 +184,7 @@ if __name__ == '__main__':
                 bot.dropoff_bottle()
             else:
                 bot.stop()
+        bot.stop()
 
     except rospy.ROSInterruptException:
         pass
