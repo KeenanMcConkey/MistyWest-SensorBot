@@ -204,12 +204,13 @@ class TrashBot:
         self.vel_pub.publish(self.vel)
 
     def find_qr_callback(self, data):
-        xpos = data.pose.position.x
-        print("Bottle X Position = {}".format(xpos))
+        if data.pose.position.z > 0:
+            xpos = min(max(-1.0,data.pose.position.x*2/data.pose.position.z),1.0)
+            print("Bottle X Position = {}".format(xpos))
 
-        # Exit state when the bottle is centered
-        if abs(xpos) < self.FORWARD_THRESHOLD:
-            self.robot_state = self.STATE_NAV_QR
+            # Exit state when the bottle is centered
+            if abs(xpos) < self.FORWARD_THRESHOLD:
+                self.robot_state = self.STATE_NAV_QR
 
     #def navigate_qr(self):
     #def navigate_qr_callback(self, data):
