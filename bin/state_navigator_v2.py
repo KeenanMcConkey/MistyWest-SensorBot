@@ -17,12 +17,14 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 60.0
-    FORWARD_SPEED = 1.8
+    FORWARD_SPEED = 1.7
     GRAB_SIZE_THRESHOLD = 265.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     PROPORTIONAL = 2.0
-    MINIUMUM_TURN = 1.5
+    MINIUMUM_TURN = 1.8
+    FIND_TURN_DELAY = 0.05
+    STARTUP_TRACKER_DELAY = 2.0
     VEL_PUBLISH_RATE = 7.0
     SERVO_PUBLISH_RATE = 1.0
     QUEUE_SIZE = 10
@@ -52,7 +54,8 @@ class TrashBot:
         self.zero_vel.angular.x = 0.0
         self.zero_vel.angular.y = 0.0
         self.zero_vel.angular.z = 0.0
-        #  Create this ROSPy node
+
+#  Create this ROSPy node
         rospy.init_node('Navigator', anonymous=True)
 
         # Published topics and publish rates
@@ -91,19 +94,19 @@ class TrashBot:
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
-            time.sleep(0.05)
+            time.sleep(FIND_TURN_DELAY)
             self.vel_pub.publish(self.zero_vel)
-            time.sleep(0.05)
+            time.sleep(FIND_TURN_DELAY)
             self.vel_rate.sleep()
 
         self.box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
-        time.sleep(2)
+        time.sleep(STARTUP_TRACKER_DELAY)
         bool_msg = Bool()
         bool_msg.data = True
         self.tracker_flag.publish(bool_msg)
-        time.sleep(2)
+        time.sleep(STARTUP_TRACKER_DELAY)
     '''
     Callback function for finding bottle whenever a new bouding box is published
     '''
@@ -112,11 +115,11 @@ class TrashBot:
         box = next(iter(list(filter(lambda x : x.Class == "bottle" ,boxes))),None)
         if box != None:
             xpos = (box.xmax + box.xmin)/2 - self.IMAGE_WIDTH/2
-            
+
             # Exit state when the bottle is centered
             if abs(xpos) < self.FORWARD_THRESHOLD:
                 self.robot_state = self.STATE_NAV_BOTTLE
-                
+
     '''
     Navigate to the first classified bottle in view until it's close enough to
     be picked up
