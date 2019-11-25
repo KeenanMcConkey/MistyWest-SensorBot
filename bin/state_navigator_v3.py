@@ -5,6 +5,7 @@ import roslib
 import rospy
 import math
 import time
+import copy
 from std_msgs.msg import Int8
 from std_msgs.msg import UInt16
 from std_msgs.msg import Bool
@@ -18,19 +19,24 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 1.7
+    FORWARD_SPEED = 1.75
     GRAB_SIZE_THRESHOLD = 250.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
+    IMAGE_HALF_WIDTH = 320.0
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.5
     VEL_PUBLISH_RATE = 7.0
     SERVO_PUBLISH_RATE = 1.0
     QUEUE_SIZE = 10
     TURN_DELAY = 0.08
-    STARTUP_TRACKER_DELAY 2.0
+    STARTUP_TRACKER_DELAY = 2.0
     STARTUP_QR_DELAY = 1.0
-
+    ARM_DOWN_ANGLE = 50.0
+    ARM_UP_ANGLE = 60.0
+    CLAW_CLOSED_ANGLE = 15.0
+    CLAW_OPEN_ANGLE = 90.0
+    
     # Different robot states
     STATE_STOP = 0
     STATE_FIND_BOTTLE = 1
@@ -49,15 +55,11 @@ class TrashBot:
         self.vel.angular.x = 0.0
         self.vel.angular.y = 0.0
         self.vel.angular.z = 0.0
-        self.zero_vel = Twist()
-        self.zero_vel.linear.x = 0.0
-        self.zero_vel.linear.y = 0.0
-        self.zero_vel.linear.z = 0.0
-        self.zero_vel.angular.x = 0.0
-        self.zero_vel.angular.y = 0.0
-        self.zero_vel.angular.z = 0.0
 
-        #  Create this ROSPy node
+        # Zero velocity message
+        self.zero_vel = copy.deepcopy(vel)
+
+        #  Create this ROS Py node
         rospy.init_node('Navigator', anonymous=True)
 
         # Published topics and publish rates
@@ -76,7 +78,6 @@ class TrashBot:
         # Set initial servo positions
         self.servo1_pub.publish(90)
         self.servo2_pub.publish(50)
-
 
         print("="*50)
         print("= Initialize TrashBot")
@@ -121,10 +122,10 @@ class TrashBot:
     '''
     def find_bottle_callback(self, data):
         boxes = data.bounding_boxes
-        box = next(iter(list(filter(lambda x : x.Class == "bottle" ,boxes))), None)
+        box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
         if box != None:
             # Determine bottle position relative to 0, in range [-1, 1]
-            xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_WIDTH / 2.0) / (self.IMAGE_WIDTH / 2.0)
+            xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH
             print("Bottle X Position = {}".format(xpos))
 
             # Exit state when the bottle is centered
@@ -157,8 +158,8 @@ class TrashBot:
         if size > self.GRAB_SIZE_THRESHOLD:
             self.robot_state = self.STATE_PICKUP_BOTTLE
 
-        # Determine bottle position relative to 0, in range [-1, 1]
-        xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_WIDTH / 2.0) / (self.IMAGE_WIDTH / 2.0)
+        # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
+        xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / IMAGE_HALF_WIDTH)
         print("Bottle X Position = {}".format(xpos))
 
         # Go forward at constant speed
