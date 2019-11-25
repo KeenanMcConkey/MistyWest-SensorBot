@@ -94,19 +94,19 @@ class TrashBot:
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
-            time.sleep(FIND_TURN_DELAY)
+            time.sleep(self.FIND_TURN_DELAY)
             self.vel_pub.publish(self.zero_vel)
-            time.sleep(FIND_TURN_DELAY)
+            time.sleep(self.FIND_TURN_DELAY)
             self.vel_rate.sleep()
 
         self.box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
-        time.sleep(STARTUP_TRACKER_DELAY)
+        time.sleep(self.STARTUP_TRACKER_DELAY)
         bool_msg = Bool()
         bool_msg.data = True
         self.tracker_flag.publish(bool_msg)
-        time.sleep(STARTUP_TRACKER_DELAY)
+        time.sleep(self.STARTUP_TRACKER_DELAY)
     '''
     Callback function for finding bottle whenever a new bouding box is published
     '''

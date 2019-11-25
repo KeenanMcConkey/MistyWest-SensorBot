@@ -19,7 +19,7 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 1.75
+    FORWARD_SPEED = 1.5
     GRAB_SIZE_THRESHOLD = 250.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
@@ -57,7 +57,7 @@ class TrashBot:
         self.vel.angular.z = 0.0
 
         # Zero velocity message
-        self.zero_vel = copy.deepcopy(vel)
+        self.zero_vel = copy.deepcopy(self.vel)
 
         #  Create this ROS Py node
         rospy.init_node('Navigator', anonymous=True)
@@ -103,9 +103,9 @@ class TrashBot:
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
-            time.sleep(TURN_DELAY)
+            time.sleep(self.TURN_DELAY)
             self.vel_pub.publish(self.zero_vel)
-            time.sleep(TURN_DELAY)
+            time.sleep(self.TURN_DELAY)
             self.vel_rate.sleep()
 
         self.box_sub.unregister()
@@ -153,19 +153,20 @@ class TrashBot:
         box = data
 
         # Determine size of bottle
-        size = box.xmax - box.xmin
+        size = box.xmax - box.xmin + 1
         print("Bottle Size = {}".format(size))
         if size > self.GRAB_SIZE_THRESHOLD:
             self.robot_state = self.STATE_PICKUP_BOTTLE
 
         # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
-        xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / IMAGE_HALF_WIDTH)
+        xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
         print("Bottle X Position = {}".format(xpos))
 
         # Go forward at constant speed
         if abs(xpos) < self.FORWARD_THRESHOLD:
-            print("Robot Forward Speed = {}".format(self.FORWARD_SPEED))
-            self.set_vel(0.0, self.FORWARD_SPEED)
+            xvel = self.FORWARD_SPEED * (self.IMAGE_HALF_WIDTH / size) - self.FORWARD_SPEED
+            print("Robot Forward Speed = {}".format(xvel))
+            self.set_vel(0.0, xvel)
         # Rotate in place
         else:
             turn = -xpos * self.PROPORTIONAL
@@ -195,9 +196,9 @@ class TrashBot:
 
         while self.robot_state is self.STATE_FIND_QR and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
-            time.sleep(TURN_DELAY)
+            time.sleep(self.TURN_DELAY)
             self.vel_pub.publish(self.zero_vel)
-            time.sleep(TURN_DELAY)
+            time.sleep(self.TURN_DELAY)
             self.vel_rate.sleep()
 
         self.qr_sub.unregister()
