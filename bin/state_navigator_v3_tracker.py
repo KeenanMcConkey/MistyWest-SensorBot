@@ -11,7 +11,7 @@ from std_msgs.msg import UInt16
 from std_msgs.msg import Bool
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PoseStamped
-from darknet_ros_msgs.msg import BoundingBox, BoundingBoxes
+from darknet_ros_msgs.msg import BoundingBox,BoundingBoxes
 
 """
 Navigator class for trash bot
@@ -36,7 +36,7 @@ class TrashBot:
     ARM_UP_ANGLE = 60.0
     CLAW_CLOSED_ANGLE = 15.0
     CLAW_OPEN_ANGLE = 90.0
-
+    
     # Different robot states
     STATE_STOP = 0
     STATE_FIND_BOTTLE = 1
@@ -137,9 +137,8 @@ class TrashBot:
     be picked up
     '''
     def navigate_bottle(self):
-        #self.box_sub = rospy.Subscriber('/object_tracker/bounding_box',
-        #                                BoundingBox, self.navigate_bottle_callback)
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
+        self.box_sub = rospy.Subscriber('/object_tracker/bounding_box',
+                                        BoundingBox, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
@@ -151,31 +150,29 @@ class TrashBot:
     Callback function for navigating to a bottle whenever a new bounding box is published
     '''
     def navigate_bottle_callback(self, data):
-        boxes = data.bounding_boxes
-        box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
-        if box != None:
-            # Navigate to first bottle seen
-            # Determine size of bottle
-            size = box.xmax - box.xmin + 1
-            print("Bottle Size = {}".format(size))
-            if size > self.GRAB_SIZE_THRESHOLD:
-                self.robot_state = self.STATE_PICKUP_BOTTLE
+        box = data
 
-            # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
-            xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
-            print("Bottle X Position = {}".format(xpos))
+        # Determine size of bottle
+        size = box.xmax - box.xmin + 1
+        print("Bottle Size = {}".format(size))
+        if size > self.GRAB_SIZE_THRESHOLD:
+            self.robot_state = self.STATE_PICKUP_BOTTLE
 
-            # Go forward at constant speed
-            if abs(xpos) < self.FORWARD_THRESHOLD:
-                xvel = self.FORWARD_SPEED * (self.IMAGE_HALF_WIDTH / size) - self.FORWARD_SPEED
-                print("Robot Forward Speed = {}".format(xvel))
-                self.set_vel(0.0, xvel)
-            # Rotate in place
-            else:
-                turn = -xpos * self.PROPORTIONAL
-                turn = turn if abs(turn) > self.MINIUMUM_TURN else math.copysign(self.MINIUMUM_TURN, turn)
-                print("Robot Turn Speed = {}".format(turn))
-                self.set_vel(turn, 0.0)
+        # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
+        xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
+        print("Bottle X Position = {}".format(xpos))
+
+        # Go forward at constant speed
+        if abs(xpos) < self.FORWARD_THRESHOLD:
+            xvel = self.FORWARD_SPEED * (self.IMAGE_HALF_WIDTH / size) - self.FORWARD_SPEED
+            print("Robot Forward Speed = {}".format(xvel))
+            self.set_vel(0.0, xvel)
+        # Rotate in place
+        else:
+            turn = -xpos * self.PROPORTIONAL
+            turn = turn if abs(turn) > self.MINIUMUM_TURN else math.copysign(self.MINIUMUM_TURN, turn)
+            print("Robot Turn Speed = {}".format(turn))
+            self.set_vel(turn, 0.0)
 
     '''
     Pickup a bottle
