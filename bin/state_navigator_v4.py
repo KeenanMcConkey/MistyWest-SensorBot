@@ -24,7 +24,7 @@ class TrashBot:
     IMAGE_HALF_WIDTH = 320.0
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.5
-    FIND_TURN = 1.0
+    FIND_TURN = 1.25
     VEL_PUBLISH_RATE = 10.0
     SERVO_PUBLISH_RATE = 1.0
     QUEUE_SIZE = 10
@@ -71,7 +71,7 @@ class TrashBot:
         self.servo_rate = rospy.Rate(self.SERVO_PUBLISH_RATE)
 
         # Initially search for a bottle
-        self.robot_state = self.STATE_FIND_BOTTLE
+        self.robot_state = self.STATE_FIND_QR
         self.state_pub.publish(self.robot_state)
 
         # Set initial servo positions
