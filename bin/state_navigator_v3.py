@@ -19,23 +19,24 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 1.5
-    GRAB_SIZE_THRESHOLD = 250.0
+    FORWARD_SPEED = 1.3
+    GRAB_SIZE_THRESHOLD = 300.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     IMAGE_HALF_WIDTH = 320.0
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.5
+    FIND_TURN = 0.75
     VEL_PUBLISH_RATE = 7.0
     SERVO_PUBLISH_RATE = 1.0
     QUEUE_SIZE = 10
     TURN_DELAY = 0.08
     STARTUP_TRACKER_DELAY = 2.0
     STARTUP_QR_DELAY = 1.0
-    ARM_DOWN_ANGLE = 50.0
-    ARM_UP_ANGLE = 60.0
-    CLAW_CLOSED_ANGLE = 15.0
-    CLAW_OPEN_ANGLE = 90.0
+    ARM_DOWN_ANGLE = 40.0
+    ARM_UP_ANGLE = 20.0
+    CLAW_CLOSED_ANGLE = 0.0
+    CLAW_OPEN_ANGLE = 0.0
 
     # Different robot states
     STATE_STOP = 0
@@ -63,7 +64,7 @@ class TrashBot:
         rospy.init_node('Navigator', anonymous=True)
 
         # Published topics and publish rates
-        self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = self.QUEUE_SIZE)
+        self.vel_pub = rospy.Publisher("/intermediate_vel", Twist, queue_size = self.QUEUE_SIZE)
         self.servo1_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
         self.servo2_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
         self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
@@ -76,8 +77,8 @@ class TrashBot:
         self.state_pub.publish(self.robot_state)
 
         # Set initial servo positions
-        self.servo1_pub.publish(90)
-        self.servo2_pub.publish(50)
+        self.servo1_pub.publish(self.CLAW_OPEN_ANGLE)
+        self.servo2_pub.publish(self.ARM_UP_ANGLE)
 
         print("="*50)
         print("= Initialize TrashBot")
@@ -99,23 +100,20 @@ class TrashBot:
     def find_bottle(self):
         self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes',
                                         BoundingBoxes, self.find_bottle_callback)
-        self.set_vel(self.MINIUMUM_TURN, 0.0)
+        self.set_vel(self.FIND_TURN, 0.0)
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
-            time.sleep(self.TURN_DELAY)
-            self.vel_pub.publish(self.zero_vel)
-            time.sleep(self.TURN_DELAY)
             self.vel_rate.sleep()
 
         self.box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
         time.sleep(self.STARTUP_TRACKER_DELAY)
-        bool_msg = Bool()
-        bool_msg.data = True
-        self.tracker_flag.publish(bool_msg)
-        time.sleep(self.STARTUP_TRACKER_DELAY)
+        #bool_msg = Bool()
+        #bool_msg.data = True
+        #self.tracker_flag.publish(bool_msg)
+        #time.sleep(self.STARTUP_TRACKER_DELAY)
 
     '''
     Callback function for finding bottle whenever a new bouding box is published
@@ -123,6 +121,7 @@ class TrashBot:
     def find_bottle_callback(self, data):
         boxes = data.bounding_boxes
         box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
+       
         if box != None:
             # Determine bottle position relative to 0, in range [-1, 1]
             xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH
@@ -153,6 +152,7 @@ class TrashBot:
     def navigate_bottle_callback(self, data):
         boxes = data.bounding_boxes
         box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
+        
         if box != None:
             # Navigate to first bottle seen
             # Determine size of bottle
@@ -167,7 +167,8 @@ class TrashBot:
 
             # Go forward at constant speed
             if abs(xpos) < self.FORWARD_THRESHOLD:
-                xvel = self.FORWARD_SPEED * (self.IMAGE_HALF_WIDTH / size) - self.FORWARD_SPEED
+                #xvel = self.FORWARD_SPEED * (self.GRAB_SIZE_THRESHOLD / size) - (self.FORWARD_SPEED)
+                xvel = self.FORWARD_SPEED
                 print("Robot Forward Speed = {}".format(xvel))
                 self.set_vel(0.0, xvel)
             # Rotate in place

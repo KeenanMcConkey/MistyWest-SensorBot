@@ -6,12 +6,9 @@ import rospy
 import math
 import time
 import copy
-from std_msgs.msg import Int8
-from std_msgs.msg import UInt16
-from std_msgs.msg import Bool
-from geometry_msgs.msg import Twist
-from geometry_msgs.msg import PoseStamped
-from darknet_ros_msgs.msg import BoundingBox,BoundingBoxes
+from std_msgs.msg import Int8, UInt16, Bool
+from geometry_msgs.msg import Twist, PoseStamped, Pose
+from darknet_ros_msgs.msg import BoundingBox, BoundingBoxes
 
 """
 Navigator class for trash bot
@@ -19,24 +16,25 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 1.5
-    GRAB_SIZE_THRESHOLD = 250.0
+    FORWARD_SPEED = 1.4
+    GRAB_SIZE_THRESHOLD = 0.004
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     IMAGE_HALF_WIDTH = 320.0
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.5
-    VEL_PUBLISH_RATE = 7.0
+    FIND_TURN = 1.0
+    VEL_PUBLISH_RATE = 10.0
     SERVO_PUBLISH_RATE = 1.0
     QUEUE_SIZE = 10
-    TURN_DELAY = 0.08
+    CLOSE_CLAW_DELAY = 0.5
     STARTUP_TRACKER_DELAY = 2.0
     STARTUP_QR_DELAY = 1.0
-    ARM_DOWN_ANGLE = 50.0
-    ARM_UP_ANGLE = 60.0
-    CLAW_CLOSED_ANGLE = 15.0
-    CLAW_OPEN_ANGLE = 90.0
-    
+    ARM_DOWN_ANGLE = 30.0
+    ARM_UP_ANGLE = 50.0
+    CLAW_CLOSED_ANGLE = 30.0
+    CLAW_OPEN_ANGLE = 40.0
+
     # Different robot states
     STATE_STOP = 0
     STATE_FIND_BOTTLE = 1
@@ -63,9 +61,9 @@ class TrashBot:
         rospy.init_node('Navigator', anonymous=True)
 
         # Published topics and publish rates
-        self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = self.QUEUE_SIZE)
-        self.servo1_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
-        self.servo2_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
+        self.vel_pub = rospy.Publisher("/intermediate_vel", Twist, queue_size = self.QUEUE_SIZE)
+        self.claw_pub = rospy.Publisher("/claw", UInt16, queue_size = self.QUEUE_SIZE)
+        self.arm_pub = rospy.Publisher("/arm", UInt16, queue_size = self.QUEUE_SIZE)
         self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
         self.tracker_flag = rospy.Publisher("/tracker_flag", Bool, queue_size = self.QUEUE_SIZE)
         self.vel_rate = rospy.Rate(self.VEL_PUBLISH_RATE)
@@ -76,8 +74,8 @@ class TrashBot:
         self.state_pub.publish(self.robot_state)
 
         # Set initial servo positions
-        self.servo1_pub.publish(90)
-        self.servo2_pub.publish(50)
+        self.claw_pub.publish(self.CLAW_OPEN_ANGLE)
+        self.arm_pub.publish(self.ARM_DOWN_ANGLE)
 
         print("="*50)
         print("= Initialize TrashBot")
@@ -99,13 +97,10 @@ class TrashBot:
     def find_bottle(self):
         self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes',
                                         BoundingBoxes, self.find_bottle_callback)
-        self.set_vel(self.MINIUMUM_TURN, 0.0)
+        self.set_vel(self.FIND_TURN, 0.0)
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
-            time.sleep(self.TURN_DELAY)
-            self.vel_pub.publish(self.zero_vel)
-            time.sleep(self.TURN_DELAY)
             self.vel_rate.sleep()
 
         self.box_sub.unregister()
@@ -123,6 +118,7 @@ class TrashBot:
     def find_bottle_callback(self, data):
         boxes = data.bounding_boxes
         box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
+       
         if box != None:
             # Determine bottle position relative to 0, in range [-1, 1]
             xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH
@@ -137,8 +133,8 @@ class TrashBot:
     be picked up
     '''
     def navigate_bottle(self):
-        self.box_sub = rospy.Subscriber('/object_tracker/bounding_box',
-                                        BoundingBox, self.navigate_bottle_callback)
+        self.box_sub = rospy.Subscriber('/object_tracker/pose',
+                                        Pose, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
@@ -150,29 +146,28 @@ class TrashBot:
     Callback function for navigating to a bottle whenever a new bounding box is published
     '''
     def navigate_bottle_callback(self, data):
-        box = data
+        zpos = data.position.z
+        print("Bottle Z Position = {}".format(zpos))
+    
+        if zpos > 0:
+            xpos = min(max(-1.0,data.position.x/(data.position.z*self.IMAGE_HALF_WIDTH)), 1.0)
+            print("Bottle X Position = {}".format(xpos))
 
-        # Determine size of bottle
-        size = box.xmax - box.xmin + 1
-        print("Bottle Size = {}".format(size))
-        if size > self.GRAB_SIZE_THRESHOLD:
-            self.robot_state = self.STATE_PICKUP_BOTTLE
-
-        # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
-        xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
-        print("Bottle X Position = {}".format(xpos))
-
-        # Go forward at constant speed
-        if abs(xpos) < self.FORWARD_THRESHOLD:
-            xvel = self.FORWARD_SPEED * (self.IMAGE_HALF_WIDTH / size) - self.FORWARD_SPEED
-            print("Robot Forward Speed = {}".format(xvel))
-            self.set_vel(0.0, xvel)
-        # Rotate in place
-        else:
-            turn = -xpos * self.PROPORTIONAL
-            turn = turn if abs(turn) > self.MINIUMUM_TURN else math.copysign(self.MINIUMUM_TURN, turn)
-            print("Robot Turn Speed = {}".format(turn))
-            self.set_vel(turn, 0.0)
+            if zpos < self.GRAB_SIZE_THRESHOLD:
+                self.robot_state = self.STATE_PICKUP_BOTTLE
+            else:
+                # Go forward at constant speed
+                if abs(xpos) < self.FORWARD_THRESHOLD:
+                    #xvel = self.FORWARD_SPEED * (self.GRAB_SIZE_THRESHOLD / size) - (self.FORWARD_SPEED)
+                    xvel = self.FORWARD_SPEED
+                    print("Robot Forward Speed = {}".format(xvel))
+                    self.set_vel(0.0, xvel)
+                # Rotate in place
+                else:
+                    turn = -xpos * self.PROPORTIONAL
+                    #turn = turn if abs(turn) > self.MINIUMUM_TURN else math.copysign(self.MINIUMUM_TURN, turn)
+                    print("Robot Turn Speed = {}".format(turn))
+                    self.set_vel(turn, 0.0)
 
     '''
     Pickup a bottle
@@ -180,11 +175,12 @@ class TrashBot:
     def pickup_bottle(self):
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
-
-        self.servo1_pub.publish(20)
-        self.servo2_pub.publish(90)
+        self.claw_pub.publish(self.CLAW_CLOSED_ANGLE)
+        time.sleep(self.CLOSE_CLAW_DELAY)
+        self.arm_pub.publish(self.ARM_UP_ANGLE)
 
         time.sleep(self.STARTUP_QR_DELAY)
+	self.robot_state = self.STATE_FIND_QR
 
     '''
     Rotate in place until a QR code is seen
@@ -196,9 +192,6 @@ class TrashBot:
 
         while self.robot_state is self.STATE_FIND_QR and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
-            time.sleep(self.TURN_DELAY)
-            self.vel_pub.publish(self.zero_vel)
-            time.sleep(self.TURN_DELAY)
             self.vel_rate.sleep()
 
         self.qr_sub.unregister()
@@ -208,7 +201,7 @@ class TrashBot:
     def find_qr_callback(self, data):
         if data.pose.position.z > 0:
             xpos = min(max(-1.0,data.pose.position.x*2/data.pose.position.z),1.0)
-            print("Bottle X Position = {}".format(xpos))
+            print("QR X Position = {}".format(xpos))
 
             # Exit state when the bottle is centered
             if abs(xpos) < self.FORWARD_THRESHOLD:
