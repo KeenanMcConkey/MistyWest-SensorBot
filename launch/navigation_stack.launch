@@ -1,0 +1,13 @@
+<launch>
+    <!-- 1. Gazebo World Initialization -->
+    <include file="$(find mybot_gazebo)/launch/mybot_world.launch"/>
+
+    <!-- 2. AMCL -->
+    <include file="$(find mybot_navigation)/launch/amcl_demo.launch"/>
+
+    <!-- 3. RVIZ -->
+    <include file="$(find mybot_description)/launch/mybot_rviz_amcl.launch"/>
+
+    <!-- 4. GMapping -->
+    <include file="$(find mybot_navigation)/launch/gmapping_demo.launch"/>
+</launch>

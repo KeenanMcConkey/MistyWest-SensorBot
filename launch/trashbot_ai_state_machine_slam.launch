@@ -6,7 +6,7 @@
 
 
   <!-- Trashbot AI node -->
-  <node name="trashbot_ai" pkg="trashbot_ai" type="state_navigator_v2.py" output="screen"/>
+  <node name="trashbot_ai" pkg="trashbot_ai" type="state_navigation_slam.py" output="screen"/>
 
 
 </launch>

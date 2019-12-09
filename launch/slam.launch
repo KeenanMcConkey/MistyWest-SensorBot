@@ -1,0 +1,21 @@
+<!--
+  Launch trashbot AI and relevant nodes
+-->
+
+<launch>
+    
+    <!--- Depth image to laser scan -->
+    <node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" name="depthimage_to_laserscan" >
+        <param name="scan_height" value="3"/> 
+        <param name="output_frame_id" value="base_link"/>
+        <remap from="image" to="camera/depth/image_rect_color" />
+    </node>
+
+    <!-- Mapping Node -->
+    <node pkg="gmapping" type="slam_gmapping" name="gmapping_node" output="screen" >
+        <remap from="odom" to="/rtabmap/odom" />
+    </node>
+
+
+
+</launch>
