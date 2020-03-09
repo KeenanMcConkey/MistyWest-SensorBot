@@ -6,6 +6,8 @@ import rospy
 import math
 import time
 import tf
+import numpy as np
+import copy
 from std_msgs.msg import Int8
 from std_msgs.msg import UInt16
 from std_msgs.msg import Bool
@@ -150,8 +152,7 @@ class TrashBot:
     is not empty anymore)
     '''
     def find_bottle(self):
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes',
-                                        BoundingBoxes, self.find_bottle_callback)
+        # self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
         self.set_vel(self.FIND_TURN, 0.0)
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
@@ -159,7 +160,7 @@ class TrashBot:
             self.state_pub.publish(self.robot_state)
             self.vel_rate.sleep()
 
-        self.box_sub.unregister()
+        # self.box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
         #time.sleep(self.STARTUP_TRACKER_DELAY)
