@@ -5,12 +5,13 @@ import roslib
 import rospy
 import math
 import time
+import numpy as np
 import copy
 from std_msgs.msg import Int8
 from std_msgs.msg import UInt16
 from std_msgs.msg import Bool
 from geometry_msgs.msg import Twist
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped,Pose
 from darknet_ros_msgs.msg import BoundingBox, BoundingBoxes
 
 """
@@ -40,11 +41,11 @@ class TrashBot:
 
     # Different robot states
     STATE_STOP = 0
-    STATE_FIND_BOTTLE = 1
-    STATE_NAV_BOTTLE = 2
-    STATE_PICKUP_BOTTLE = 3
-    STATE_FIND_QR = 4
-    STATE_NAV_QR = 5
+    STATE_SET_DROPOFF = 1
+    STATE_FIND_BOTTLE = 2
+    STATE_NAV_BOTTLE = 3
+    STATE_PICKUP_BOTTLE = 4
+    STATE_NAV_DROPOFF = 5
     STATE_DROPOFF_BOTTLE = 6
 
     def __init__(self):
@@ -84,6 +85,15 @@ class TrashBot:
         print("= Initialize TrashBot")
         print("="*50)
 
+    def euler_to_quaternion(self,roll, pitch, yaw):
+
+        qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+        qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+        qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+        qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+
+        return [qx, qy, qz, qw]
+
     '''
     Stop the robot's movement
     '''
@@ -93,6 +103,18 @@ class TrashBot:
         while self.robot_state is self.STATE_STOP and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
             self.vel_rate.sleep()
+
+    def set_dropoff(self):
+        # Just set at origin for now
+        self.dropoff_pose = Pose()
+        self.dropoff_pose.position.x = 0.0
+        self.dropoff_pose.position.y = 0.0
+        self.dropoff_pose.position.z = 0.0
+        qx,qy,qz,qw = self.euler_to_quaternion(0.0,0.0,0.0)
+        self.dropoff_pose.orientation.x = qx
+        self.dropoff_pose.orientation.y = qy
+        self.dropoff_pose.orientation.z = qz
+        self.dropoff_pose.orientation.w = qw
 
     '''
     Rotate in place until a bottle is seen, then centre it in the robots camera
@@ -121,7 +143,7 @@ class TrashBot:
     def find_bottle_callback(self, data):
         boxes = data.bounding_boxes
         box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
-       
+
         if box != None:
             # Determine bottle position relative to 0, in range [-1, 1]
             xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH
@@ -152,7 +174,7 @@ class TrashBot:
     def navigate_bottle_callback(self, data):
         boxes = data.bounding_boxes
         box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
-        
+
         if box != None:
             # Navigate to first bottle seen
             # Determine size of bottle
@@ -193,34 +215,9 @@ class TrashBot:
     '''
     Rotate in place until a QR code is seen
     '''
-    def find_qr(self):
-        self.qr_sub = rospy.Subscriber('/visp_auto_tracker/object_position',
-                                        PoseStamped, self.find_qr_callback)
-        self.set_vel(self.MINIUMUM_TURN, 0.0)
+    def navigate_dropoff(self):
+        pass
 
-        while self.robot_state is self.STATE_FIND_QR and not rospy.is_shutdown():
-            self.vel_pub.publish(self.vel)
-            time.sleep(self.TURN_DELAY)
-            self.vel_pub.publish(self.zero_vel)
-            time.sleep(self.TURN_DELAY)
-            self.vel_rate.sleep()
-
-        self.qr_sub.unregister()
-        self.set_vel(0.0, 0.0)
-        self.vel_pub.publish(self.vel)
-
-    def find_qr_callback(self, data):
-        if data.pose.position.z > 0:
-            xpos = min(max(-1.0,data.pose.position.x*2/data.pose.position.z),1.0)
-            print("Bottle X Position = {}".format(xpos))
-
-            # Exit state when the bottle is centered
-            if abs(xpos) < self.FORWARD_THRESHOLD:
-                self.robot_state = self.STATE_NAV_QR
-
-    #def navigate_qr(self):
-    #def navigate_qr_callback(self, data):
-    #def dropoff_bottle(self):
 
     '''
     Set turn velocity and forward velocity (i.e. Z Gyro and X Velocity in Twist msg)
@@ -237,17 +234,17 @@ if __name__ == '__main__':
             bot.state_pub.publish(bot.robot_state)
 
             if bot.robot_state == bot.STATE_STOP:
-               bot.stop()
+                bot.stop()
+            elif bot.robot_state == bot.STATE_SET_DROPOFF:
+                bot.set_dropoff()
             elif bot.robot_state == bot.STATE_FIND_BOTTLE:
-               bot.find_bottle()
+                bot.find_bottle()
             elif bot.robot_state == bot.STATE_NAV_BOTTLE:
-               bot.navigate_bottle()
+                bot.navigate_bottle()
             elif bot.robot_state == bot.STATE_PICKUP_BOTTLE:
                 bot.pickup_bottle()
-            elif bot.robot_state == bot.STATE_FIND_QR:
-                bot.find_qr()
-            elif bot.robot_state == bot.STATE_NAV_QR:
-                bot.navigate_qr()
+            elif bot.robot_state == bot.NAGIVATE_DROPOFF:
+                bot.navigate_dropoff()
             elif bot.robot_state == bot.STATE_DROPOFF_BOTTLE:
                 bot.dropoff_bottle()
             else:
