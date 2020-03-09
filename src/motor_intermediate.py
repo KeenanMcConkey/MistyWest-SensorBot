@@ -14,7 +14,7 @@ Navigator class for trash bot
 """
 class motor_intermediate:
     VEL_PUBLISH_RATE = 7.0
-    MINIUMUM_TURN = 1.5
+    MINIUMUM_TURN = 1.0
     QUEUE_SIZE = 10
     
     def __init__(self):

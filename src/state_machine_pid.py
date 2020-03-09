@@ -28,7 +28,7 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 1.3
+    FORWARD_SPEED = 0.7
     GRAB_SIZE_THRESHOLD = 300.0
     GRAB_DIST_THRESHOLD = 0.12 # m
     IMAGE_HEIGHT = 480.0
@@ -40,7 +40,7 @@ class TrashBot:
     QUEUE_SIZE = 10
 
     PROPORTIONAL = 2.0
-    MINIUMUM_TURN = 1.5
+    MINIUMUM_TURN = 0.7
     FIND_TURN = 1.4
     CLAW_DELAY = 0.5
     TURN_DELAY = 0.08
@@ -84,7 +84,7 @@ class TrashBot:
         self.goal_reached_sub = message_filters.Subscriber('/rtabmap/goal_reached', Bool)
 
         # Time synchronizer
-        self.ts = message_filters.TimeSynchronizer([self.depth_image_sub, self.box_sub], self.QUEUE_SIZE)
+        self.ts = message_filters.TimeSynchronizer([self.depth_image_sub, self.box_sub], 350)
         self.ts.registerCallback(self.navigate_bottle_callback)
 
         # Initially set dropoff
@@ -152,7 +152,7 @@ class TrashBot:
     is not empty anymore)
     '''
     def find_bottle(self):
-        # self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
+        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.find_bottle_callback)
         self.set_vel(self.FIND_TURN, 0.0)
 
         while self.robot_state is self.STATE_FIND_BOTTLE and not rospy.is_shutdown():
@@ -160,7 +160,7 @@ class TrashBot:
             self.state_pub.publish(self.robot_state)
             self.vel_rate.sleep()
 
-        # self.box_sub.unregister()
+        self.box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
         #time.sleep(self.STARTUP_TRACKER_DELAY)
@@ -186,14 +186,14 @@ class TrashBot:
     be picked up
     '''
     def navigate_bottle(self):
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
+        # self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
             self.state_pub.publish(self.robot_state)
             self.vel_rate.sleep()
 
-        self.box_sub.unregister()
+        # self.box_sub.unregister()
 
     '''
     Callback function for navigating to a bottle whenever a new bottle pose is published

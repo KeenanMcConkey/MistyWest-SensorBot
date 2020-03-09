@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+
+<launch>
+    <node pkg="trashbot_ai" type="state_machine_no_depth.py" name="Navigator" output="screen"/>
+    <node pkg="trashbot_ai" type="motor_intermediate.py" name="motor_intermediate"/>
+</launch>

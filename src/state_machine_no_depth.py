@@ -13,11 +13,14 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Pose
 from sensor_msgs.msg import Image
+import copy
+import numpy as np
 import message_filters
 from cv_bridge import CvBridge, CvBridgeError
 from darknet_ros_msgs.msg import BoundingBox,BoundingBoxes
 
-print("Environment Ready")
+print("="*50)
+print("= Environment Ready")
 
 """
 Navigator class for trash bot
@@ -25,8 +28,8 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 1.3
-    GRAB_SIZE_THRESHOLD = 300.0
+    FORWARD_SPEED = 0.3
+    GRAB_SIZE_THRESHOLD = 250.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     IMAGE_HALF_WIDTH = 320.0
@@ -36,8 +39,8 @@ class TrashBot:
     QUEUE_SIZE = 10
 
     PROPORTIONAL = 2.0
-    MINIUMUM_TURN = 1.5
-    FIND_TURN = 1.4
+    MINIUMUM_TURN = 1.0
+    FIND_TURN = 0.5
     VEL_PUBLISH_RATE = 10.0
     SERVO_PUBLISH_RATE = 10.0
     QUEUE_SIZE = 10
@@ -104,7 +107,6 @@ class TrashBot:
         # Goal radius
         self.goal_radius = 0.5
 
-        print("="*50)
         print("= Initialize TrashBot")
         print("="*50)
 
@@ -134,15 +136,17 @@ class TrashBot:
         self.vel_pub.publish(self.vel)
 
         # Just set at origin for now
-        self.dropoff_pose = Pose()
-        self.dropoff_pose.position.x = 0.0
-        self.dropoff_pose.position.y = 0.0
-        self.dropoff_pose.position.z = 0.0
+        self.dropoff_pose = PoseStamped()
+        self.dropoff_pose.header.stamp = rospy.Time.now()
+
+        self.dropoff_pose.pose.position.x = 0.0
+        self.dropoff_pose.pose.position.y = 0.0
+        self.dropoff_pose.pose.position.z = 0.0
         qx,qy,qz,qw = self.euler_to_quaternion(0.0,0.0,0.0)
-        self.dropoff_pose.orientation.x = qx
-        self.dropoff_pose.orientation.y = qy
-        self.dropoff_pose.orientation.z = qz
-        self.dropoff_pose.orientation.w = qw
+        self.dropoff_pose.pose.orientation.x = qx
+        self.dropoff_pose.pose.orientation.y = qy
+        self.dropoff_pose.pose.orientation.z = qz
+        self.dropoff_pose.pose.orientation.w = qw
 
         self.robot_state = self.STATE_FIND_BOTTLE
 
@@ -249,7 +253,7 @@ class TrashBot:
     Navigate to the dropoff location
     '''
     def navigate_dropoff(self):
-        self.goal_simple_pub.publish(dropoff_pose)
+        self.goal_simple_pub.publish(self.dropoff_pose)
         self.goal_reached_sub = rospy.Subscriber('/rtabmap/goal_reached', Bool, self.navigate_dropoff_callback)
 
         while self.robot_state is self.STATE_NAV_DROPOFF and not rospy.is_shutdown():
@@ -304,7 +308,7 @@ if __name__ == '__main__':
                 bot.navigate_bottle()
             elif bot.robot_state == bot.STATE_PICKUP_BOTTLE:
                 bot.pickup_bottle()
-            elif bot.robot_state == bot.NAGIVATE_DROPOFF:
+            elif bot.robot_state == bot.STATE_NAV_DROPOFF:
                 bot.navigate_dropoff()
             elif bot.robot_state == bot.STATE_DROPOFF_BOTTLE:
                 bot.dropoff_bottle()
