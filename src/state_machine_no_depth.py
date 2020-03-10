@@ -138,7 +138,7 @@ class TrashBot:
         # Set at dropoff for now
         self.dropoff_pose = PoseStamped()
         self.dropoff_pose.header.stamp = rospy.Time.now()
-        self.dropoff_pose.header.frame_id = self._robot.get_planning_frame()
+        self.dropoff_pose.header.frame_id = "map"
         self.dropoff_pose.pose.position.x = 0.0
         self.dropoff_pose.pose.position.y = 0.0
         self.dropoff_pose.pose.position.z = 0.0
