@@ -28,30 +28,28 @@ Navigator class for trash bot
 class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 0.3
+    FORWARD_SPEED = 0.25
     GRAB_SIZE_THRESHOLD = 250.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     IMAGE_HALF_WIDTH = 320.0
 
-    VEL_PUBLISH_RATE = 7.0
-    SERVO_PUBLISH_RATE = 7.0
+    VEL_PUBLISH_RATE = 10.0 #7.0
+    SERVO_PUBLISH_RATE = 10.0 #7.0
     QUEUE_SIZE = 10
 
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.0
     FIND_TURN = 0.5
-    VEL_PUBLISH_RATE = 10.0
-    SERVO_PUBLISH_RATE = 10.0
     QUEUE_SIZE = 10
     CLAW_DELAY = 0.5
     TURN_DELAY = 0.08
-    STARTUP_TRACKER_DELAY = 1.0
+    STARTUP_TRACKER_DELAY = 0.5
     STARTUP_DROPOFF_DELAY = 1.0
-    ARM_DOWN_ANGLE = 30.0
-    ARM_UP_ANGLE = 50.0
-    CLAW_CLOSED_ANGLE = 30.0
-    CLAW_OPEN_ANGLE = 40.0
+    ARM_DOWN_ANGLE = 40.0
+    ARM_UP_ANGLE = 20.0
+    CLAW_CLOSED_ANGLE = 20.0
+    CLAW_OPEN_ANGLE = 0.0
 
     # Different robot states
     STATE_STOP = 0
@@ -65,7 +63,7 @@ class TrashBot:
     def __init__(self):
         #  Create this ROSPy node
         rospy.init_node('Navigator', anonymous=True)
-        self.bridge = CvBridge()
+        #self.bridge = CvBridge()
 
         # Published topics
         self.goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = self.QUEUE_SIZE)
@@ -82,7 +80,7 @@ class TrashBot:
         # Subscribed topics
         self.rgb_image_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
         self.depth_image_sub = message_filters.Subscriber('/camera/depth/image_rect_raw', Image)
-        self.box_sub = message_filters.Subscriber('/darknet_ros/bounding_boxes',BoundingBoxes)
+        self.box_sub = message_filters.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes)
         self.goal_reached_sub = message_filters.Subscriber('/rtabmap/goal_reached', Bool)
 
         # Initially set dropoff
@@ -101,16 +99,13 @@ class TrashBot:
         self.vel.angular.y = 0.0
         self.vel.angular.z = 0.0
 
-        # Zero velocity message
-        self.zero_vel = copy.deepcopy(self.vel)
-
-        # Goal radius
-        self.goal_radius = 0.5
-
         print("= Initialize TrashBot")
         print("="*50)
 
-    def euler_to_quaternion(self,roll, pitch, yaw):
+    '''
+    Convert Euler rotation to Quaternion
+    '''
+    def euler_to_quaternion(self, roll, pitch, yaw):
 
         qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
         qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
@@ -130,19 +125,21 @@ class TrashBot:
             self.state_pub.publish(self.robot_state)
             self.vel_rate.sleep()
 
+    '''
+    Set bottle dropoff location
+    '''
     def set_dropoff(self):
-        self.state_pub.publish(self.robot_state)
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
+        self.state_pub.publish(self.robot_state)
 
-        # Just set at origin for now
+        # Set at dropoff for now
         self.dropoff_pose = PoseStamped()
         self.dropoff_pose.header.stamp = rospy.Time.now()
-
         self.dropoff_pose.pose.position.x = 0.0
         self.dropoff_pose.pose.position.y = 0.0
         self.dropoff_pose.pose.position.z = 0.0
-        qx,qy,qz,qw = self.euler_to_quaternion(0.0,0.0,0.0)
+        qx, qy, qz, qw = self.euler_to_quaternion(0.0,0.0,0.0)
         self.dropoff_pose.pose.orientation.x = qx
         self.dropoff_pose.pose.orientation.y = qy
         self.dropoff_pose.pose.orientation.z = qz
@@ -167,7 +164,13 @@ class TrashBot:
         self.box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
-        #time.sleep(self.STARTUP_TRACKER_DELAY)
+        time.sleep(self.STARTUP_TRACKER_DELAY)
+
+        # Startup the object tracker
+        bool_msg = Bool()
+        bool_msg.data = True
+        self.tracker_flag.publish(bool_msg)
+        time.sleep(self.STARTUP_TRACKER_DELAY)
 
     '''
     Callback function for finding bottle whenever a new bounding box is published
@@ -190,7 +193,9 @@ class TrashBot:
     be picked up
     '''
     def navigate_bottle(self):
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
+        self.box_sub = rospy.Subscriber('/object_tracker/bounding_box',
+                                        BoundingBox, self.navigate_bottle_callback)
+        #self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
@@ -218,7 +223,7 @@ class TrashBot:
 
             # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
             xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
-            print("Bottle X Position = {}".format(xpos))
+            print("Bottle X Position (-1 to 1) = {}".format(xpos))
 
             # Go forward at constant speed
             if abs(xpos) < self.FORWARD_THRESHOLD:
@@ -238,9 +243,9 @@ class TrashBot:
     Pickup a bottle
     '''
     def pickup_bottle(self):
-        self.state_pub.publish(self.robot_state)
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
+        self.state_pub.publish(self.robot_state)
 
         self.claw_pub.publish(self.CLAW_CLOSED_ANGLE)
         time.sleep(self.CLAW_DELAY)
