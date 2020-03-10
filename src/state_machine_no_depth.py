@@ -46,10 +46,10 @@ class TrashBot:
     TURN_DELAY = 0.08
     STARTUP_TRACKER_DELAY = 0.5
     STARTUP_DROPOFF_DELAY = 1.0
-    ARM_DOWN_ANGLE = 40.0
-    ARM_UP_ANGLE = 20.0
-    CLAW_CLOSED_ANGLE = 20.0
-    CLAW_OPEN_ANGLE = 0.0
+    ARM_DOWN_ANGLE = 95.0
+    ARM_UP_ANGLE = 80.0
+    CLAW_CLOSED_ANGLE = 40.0
+    CLAW_OPEN_ANGLE = 80.0
 
     # Different robot states
     STATE_STOP = 0
@@ -325,3 +325,7 @@ if __name__ == '__main__':
                 bot.dropoff_bottle()
             else:
                 bot.stop()
+
+    except Exception as e:
+        print(e)
+
