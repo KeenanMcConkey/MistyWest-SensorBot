@@ -138,10 +138,11 @@ class TrashBot:
         # Set at dropoff for now
         self.dropoff_pose = PoseStamped()
         self.dropoff_pose.header.stamp = rospy.Time.now()
+        self.dropoff_pose.header.frame_id = self._robot.get_planning_frame()
         self.dropoff_pose.pose.position.x = 0.0
         self.dropoff_pose.pose.position.y = 0.0
         self.dropoff_pose.pose.position.z = 0.0
-        qx, qy, qz, qw = self.euler_to_quaternion(0.0,0.0,0.0)
+        qx, qy, qz, qw = self.euler_to_quaternion(0.0, 0.0, 0.0)
         self.dropoff_pose.pose.orientation.x = qx
         self.dropoff_pose.pose.orientation.y = qy
         self.dropoff_pose.pose.orientation.z = qz
@@ -266,6 +267,7 @@ class TrashBot:
     '''
     def navigate_dropoff(self):
         self.goal_simple_pub.publish(self.dropoff_pose)
+        print("Published Goal, ID = ", self.dropoff_pose.header.frame_id)
         self.goal_reached_sub = rospy.Subscriber('/rtabmap/goal_reached', Bool, self.navigate_dropoff_callback)
 
         while self.robot_state is self.STATE_NAV_DROPOFF and not rospy.is_shutdown():
@@ -328,4 +330,3 @@ if __name__ == '__main__':
 
     except Exception as e:
         print(e)
-
