@@ -71,7 +71,7 @@ class TrashBot:
         self.claw_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
         self.arm_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
         self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
-        self.tracker_flag = rospy.Publisher("/tracker_flag", Bool, queue_size = self.QUEUE_SIZE)
+        #self.tracker_flag = rospy.Publisher("/tracker_flag", Bool, queue_size = self.QUEUE_SIZE)
 
         # And publish rates
         self.vel_rate = rospy.Rate(self.VEL_PUBLISH_RATE)
@@ -167,10 +167,10 @@ class TrashBot:
         time.sleep(self.STARTUP_TRACKER_DELAY)
 
         # Startup the object tracker
-        bool_msg = Bool()
-        bool_msg.data = True
-        self.tracker_flag.publish(bool_msg)
-        time.sleep(self.STARTUP_TRACKER_DELAY)
+        #bool_msg = Bool()
+        #bool_msg.data = True
+        #self.tracker_flag.publish(bool_msg)
+        #time.sleep(self.STARTUP_TRACKER_DELAY)
 
     '''
     Callback function for finding bottle whenever a new bounding box is published
