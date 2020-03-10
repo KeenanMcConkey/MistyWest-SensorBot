@@ -265,11 +265,11 @@ class TrashBot:
     Navigate to the dropoff location
     '''
     def navigate_dropoff(self):
-        print("Navigating to Dropoff")
         self.goal_simple_pub.publish(self.dropoff_pose)
         self.goal_reached_sub = rospy.Subscriber('/rtabmap/goal_reached', Bool, self.navigate_dropoff_callback)
 
         while self.robot_state is self.STATE_NAV_DROPOFF and not rospy.is_shutdown():
+            print("Navigating to Dropoff")
             self.state_pub.publish(self.robot_state)
             rospy.spin()
 
