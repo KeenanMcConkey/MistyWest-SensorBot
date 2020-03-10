@@ -68,7 +68,7 @@ class TrashBot:
         self.bridge = CvBridge()
 
         # Published topics
-        self.goal_simple_pub = rospy.Publisher("/move_base/goal_simple", PoseStamped, queue_size = self.QUEUE_SIZE)
+        self.goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = self.QUEUE_SIZE)
         self.vel_pub = rospy.Publisher("/intermediate_vel", Twist, queue_size = self.QUEUE_SIZE)
         self.claw_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
         self.arm_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
@@ -259,9 +259,6 @@ class TrashBot:
         while self.robot_state is self.STATE_NAV_DROPOFF and not rospy.is_shutdown():
             self.state_pub.publish(self.robot_state)
             rospy.spin()
-
-        self.box_sub.unregister()
-
 
     '''
     Callback function for navigating to dropoff location, checks if goal reached
