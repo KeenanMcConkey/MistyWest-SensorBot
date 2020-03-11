@@ -33,20 +33,42 @@ def euler_to_quaternion(roll, pitch, yaw):
 
 if __name__=="__main__":
 
-    goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = self.QUEUE_SIZE)
+    rospy.init_node('test_post_nav_goal', anonymous=True)
+
+    goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = 10)
+
+    l = """{header: 
+seq: 0
+stamp: 
+    secs: 1583892632
+    nsecs: 339109681
+frame_id: "map"
+pose: 
+position: 
+    x: -0.00680875778198
+    y: -0.061126768589
+    z: 0.0
+orientation: 
+    x: 0.0
+    y: 0.0
+    z: 0.983146331622
+    w: 0.182820378018}"""
+
+    time.sleep(1)
 
     # Set at dropoff for now
     dropoff_pose = PoseStamped()
+    dropoff_pose.header.seq = 0
     dropoff_pose.header.stamp = rospy.Time.now()
     dropoff_pose.header.frame_id = "map"
     dropoff_pose.pose.position.x = 0.0
     dropoff_pose.pose.position.y = 0.0
     dropoff_pose.pose.position.z = 0.0
     qx, qy, qz, qw = euler_to_quaternion(0.0, 0.0, 0.0)
-    dropoff_pose.pose.orientation.x = qx
-    dropoff_pose.pose.orientation.y = qy
-    dropoff_pose.pose.orientation.z = qz
-    dropoff_pose.pose.orientation.w = qw
+    dropoff_pose.pose.orientation.x = float(qx)
+    dropoff_pose.pose.orientation.y = float(qy)
+    dropoff_pose.pose.orientation.z = float(qz)
+    dropoff_pose.pose.orientation.w = float(qw)
 
     goal_simple_pub.publish(dropoff_pose)
     print("Published Goal, ID = ", dropoff_pose.header.frame_id)
