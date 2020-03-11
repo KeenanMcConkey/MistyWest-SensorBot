@@ -76,7 +76,7 @@ class TrashBot:
 
         #  Create this ROSPy node
         rospy.init_node('Navigator', anonymous=True)
-        #self.bridge = CvBridge()
+        self.bridge = CvBridge()
 
         # Published topics
         self.goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = self.QUEUE_SIZE)
@@ -84,7 +84,6 @@ class TrashBot:
         self.claw_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
         self.arm_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
         self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
-        #self.tracker_flag = rospy.Publisher("/tracker_flag", Bool, queue_size = self.QUEUE_SIZE)
 
         # And publish rates
         self.vel_rate = rospy.Rate(self.VEL_PUBLISH_RATE)
@@ -93,9 +92,13 @@ class TrashBot:
         # Subscribed topics
         self.rgb_image_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
         self.depth_image_sub = message_filters.Subscriber('/camera/depth/image_rect_raw', Image)
-        self.box_sub = message_filters.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes)
+        self.dnet_box_sub = message_filters.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes)
+        self.ot_box_sub = message_filters.Subscriber('/object_tracker/bounding_box', BoundingBox)
         self.goal_reached_sub = message_filters.Subscriber('/rtabmap/goal_reached', Bool)
         self.robot_pose_sub = message_filters.Subscriber('/robot_pose', Pose)
+
+        # Time synchronizer between depth image and object tracker box
+        self.ts = message_filters.TimeSynchronizer([self.depth_image_sub, self.ot_box_sub], self.QUEUE_SIZE)
 
         # Initially set dropoff
         self.robot_state = self.STATE_SET_DROPOFF
@@ -175,7 +178,7 @@ class TrashBot:
     def find_bottle(self):
 
         print("Finding Bottle")
-        self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes',
+        self.dnet_box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes',
                                         BoundingBoxes, self.find_bottle_callback)
         self.set_vel(self.FIND_TURN, 0.0)
 
@@ -184,7 +187,7 @@ class TrashBot:
             self.state_pub.publish(self.robot_state)
             self.vel_rate.sleep()
 
-        self.box_sub.unregister()
+        self.dnet_box_sub.unregister()
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
         time.sleep(self.STARTUP_TRACKER_DELAY)
@@ -219,16 +222,18 @@ class TrashBot:
     def navigate_bottle(self):
 
         print("Navigating to Bottle")
-        self.box_sub = rospy.Subscriber('/object_tracker/bounding_box',
+        self.ts.registerCallback(self.navigate_bottle_callback)
+        #self.ot_box_sub = rospy.Subscriber('/object_tracker/bounding_box',
                                         BoundingBox, self.navigate_bottle_callback)
-        #self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
+        #self.dnet_box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
             self.vel_pub.publish(self.vel)
             self.state_pub.publish(self.robot_state)
             self.vel_rate.sleep()
 
-        self.box_sub.unregister()
+        # Instead of unregister
+        self.ts.registerCallback(self.dummy_navigate_bottle_callback)
 
     '''
     Callback function for navigating to a bottle whenever a new bottle pose is published
@@ -239,33 +244,48 @@ class TrashBot:
         #boxes = data.bounding_boxes
         #box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
         box = data
+        
+        # Get distance to bottle from depth image
+        depth_image = self.bridge.imgmsg_to_cv2(depth, "32FC1")
+        depth = np.array(depth_image, dtype = np.dtype('f8'))
 
-        #if box != None:
-        if True:
-            # Navigate to first bottle seen
-            # Determine size of bottle
-            size = box.xmax - box.xmin + 1
-            print("Bottle Size = {}".format(size))
-            if size > self.GRAB_SIZE_THRESHOLD:
-                self.robot_state = self.STATE_PICKUP_BOTTLE
-                return
+        height, width = self.IMAGE_HEIGHT,self.IMAGE_WIDTH
+        expected = 300.0
+        scale = height / expected
+        crop_start = 0.0
+        xmin_depth = int((box.xmin * expected + crop_start) * scale)
+        ymin_depth = int((box.ymin * expected) * scale)
+        xmax_depth = int((box.xmax * expected + crop_start) * scale)
+        ymax_depth = int((box.ymax * expected) * scale)
 
-            # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
-            xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
-            print("Bottle X Position (-1 to 1) = {}".format(xpos))
+        depth = depth[xmin_depth:xmax_depth, ymin_depth:ymax_depth].astype(float)
 
-            # Go forward at constant speed
-            if abs(xpos) < self.FORWARD_THRESHOLD:
-                #xvel = self.FORWARD_SPEED * (self.GRAB_SIZE_THRESHOLD / size) - (self.FORWARD_SPEED)
-                xvel = self.FORWARD_SPEED
-                print("Robot Forward Speed = {}".format(xvel))
-                self.set_vel(0.0, xvel)
-            # Rotate in place
-            else:
-                turn = -xpos * self.PROPORTIONAL
-                turn = turn if abs(turn) > self.MINIUMUM_TURN else math.copysign(self.MINIUMUM_TURN, turn)
-                print("Robot Turn Speed = {}".format(turn))
-                self.set_vel(turn, 0.0)
+        # Get data scale from the device and convert to meters
+        depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
+        depth = depth * depth_scale
+
+        distance, _, _, _ = cv2.mean(depth)
+        print("Bottle Distance {}".format(distance))
+        if distance < self.GRAB_DIST_THRESHOLD:
+            self.robot_state = self.STATE_PICKUP_BOTTLE
+            return
+
+        # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
+        xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
+        print("Bottle X Position (-1 to 1) = {}".format(xpos))
+
+        # Go forward at constant speed
+        if abs(xpos) < self.FORWARD_THRESHOLD:
+            #xvel = self.FORWARD_SPEED * (self.GRAB_SIZE_THRESHOLD / size) - (self.FORWARD_SPEED)
+            xvel = self.FORWARD_SPEED
+            print("Robot Forward Speed = {}".format(xvel))
+            self.set_vel(0.0, xvel)
+        # Rotate in place
+        else:
+            turn = -xpos * self.PROPORTIONAL
+            turn = turn if abs(turn) > self.MINIUMUM_TURN else math.copysign(self.MINIUMUM_TURN, turn)
+            print("Robot Turn Speed = {}".format(turn))
+            self.set_vel(turn, 0.0)
 
 
     '''
