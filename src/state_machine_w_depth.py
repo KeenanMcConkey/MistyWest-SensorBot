@@ -35,8 +35,8 @@ class TrashBot:
     IMAGE_HALF_WIDTH = 320.0
 
     # Publish/subscribe
-    VEL_PUBLISH_RATE = 10.0 #7.0
-    SERVO_PUBLISH_RATE = 10.0 #7.0
+    VEL_PUBLISH_RATE = 20.0 #10.0 #7.0
+    SERVO_PUBLISH_RATE = 20.0 #10.0 #7.0
     QUEUE_SIZE = 10
 
     # Motor control
@@ -224,7 +224,7 @@ class TrashBot:
         print("Navigating to Bottle")
         self.ts.registerCallback(self.navigate_bottle_callback)
         #self.ot_box_sub = rospy.Subscriber('/object_tracker/bounding_box',
-                                        BoundingBox, self.navigate_bottle_callback)
+        #                                BoundingBox, self.navigate_bottle_callback)
         #self.dnet_box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
@@ -233,18 +233,20 @@ class TrashBot:
             self.vel_rate.sleep()
 
         # Instead of unregister
+        self.set_vel(0.0, 0.0)
+        self.vel_pub.publish(self.vel)
         self.ts.registerCallback(self.dummy_navigate_bottle_callback)
 
     '''
     Callback function for navigating to a bottle whenever a new bottle pose is published
     by the object_tracker
     '''
-    def navigate_bottle_callback(self, data):
+    def navigate_bottle_callback(self, depth, box):
 
         #boxes = data.bounding_boxes
         #box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
-        box = data
-        
+        #box = data
+
         # Get distance to bottle from depth image
         depth_image = self.bridge.imgmsg_to_cv2(depth, "32FC1")
         depth = np.array(depth_image, dtype = np.dtype('f8'))
@@ -287,6 +289,11 @@ class TrashBot:
             print("Robot Turn Speed = {}".format(turn))
             self.set_vel(turn, 0.0)
 
+    '''
+    Dummy navigation callback, does nothing
+    '''
+    def dummy_navigate_bottle_callback(self, depth, box):
+        # Do nothing
 
     '''
     Pickup a bottle
@@ -294,8 +301,6 @@ class TrashBot:
     def pickup_bottle(self):
 
         print("Picking Up Bottle")
-        self.set_vel(0.0, 0.0)
-        self.vel_pub.publish(self.vel)
         self.state_pub.publish(self.robot_state)
 
         self.claw_pub.publish(self.CLAW_CLOSED_ANGLE)
