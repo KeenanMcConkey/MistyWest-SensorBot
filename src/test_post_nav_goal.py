@@ -64,10 +64,10 @@ orientation:
     dropoff_pose.pose.position.y = 0.0
     dropoff_pose.pose.position.z = 0.0
     qx, qy, qz, qw = euler_to_quaternion(0.0, 0.0, 0.0)
-    dropoff_pose.pose.orientation.x = qx
-    dropoff_pose.pose.orientation.y = qy
-    dropoff_pose.pose.orientation.z = qz
-    dropoff_pose.pose.orientation.w = qw
+    dropoff_pose.pose.orientation.x = float(qx)
+    dropoff_pose.pose.orientation.y = float(qy)
+    dropoff_pose.pose.orientation.z = float(qz)
+    dropoff_pose.pose.orientation.w = float(qw)
 
     goal_simple_pub.publish(dropoff_pose)
     print("Published Goal, ID = ", dropoff_pose.header.frame_id)
