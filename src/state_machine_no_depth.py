@@ -26,35 +26,44 @@ print("= Environment Ready")
 Navigator class for trash bot
 """
 class TrashBot:
-    # Class constants
-    FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 0.25
-    BACKWARD_SPEED = -0.25
+    ### CLASS CONSTANTS ###
+    
+    # Camera
     GRAB_SIZE_THRESHOLD = 250.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     IMAGE_HALF_WIDTH = 320.0
 
+    # Publish/subscribe
     VEL_PUBLISH_RATE = 10.0 #7.0
     SERVO_PUBLISH_RATE = 10.0 #7.0
     QUEUE_SIZE = 10
 
+    # Motor control
+    FORWARD_THRESHOLD = 0.18
+    FORWARD_SPEED = 0.25
+    BACKWARD_SPEED = -0.25
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.0
     FIND_TURN = 0.5
     QUEUE_SIZE = 10
+
+    # Delays
     CLAW_DELAY = 0.5
     TURN_DELAY = 0.08
     REVERSE_DELAY = 0.5
     TURNAROUND_DELAY = 1.0
     STARTUP_TRACKER_DELAY = 0.5
     STARTUP_DROPOFF_DELAY = 1.0
+    SET_DROPOFF_DELAY = 1.0
+
+    # Claw angles
     ARM_DOWN_ANGLE = 95.0
     ARM_UP_ANGLE = 80.0
     CLAW_CLOSED_ANGLE = 40.0
     CLAW_OPEN_ANGLE = 80.0
 
-    # Different robot states
+    # Robot states
     STATE_STOP = 0
     STATE_SET_DROPOFF = 1
     STATE_FIND_BOTTLE = 2
@@ -64,6 +73,7 @@ class TrashBot:
     STATE_DROPOFF_BOTTLE = 6
 
     def __init__(self):
+        
         #  Create this ROSPy node
         rospy.init_node('Navigator', anonymous=True)
         #self.bridge = CvBridge()
@@ -122,6 +132,7 @@ class TrashBot:
     Stop the robot's movement
     '''
     def stop(self):
+
         self.set_vel(0.0, 0.0)
 
         while self.robot_state is self.STATE_STOP and not rospy.is_shutdown():
@@ -134,23 +145,26 @@ class TrashBot:
     Set bottle dropoff location
     '''
     def set_dropoff(self):
+        
         print("Setting Dropoff Point")
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
         self.state_pub.publish(self.robot_state)
+        time.sleep(SET_DROPOFF_DELAY)
 
         # Set at dropoff for now
         self.dropoff_pose = PoseStamped()
+        self.dropoff_pose.header.seq = 0
         self.dropoff_pose.header.stamp = rospy.Time.now()
         self.dropoff_pose.header.frame_id = "_dropoff_"
         self.dropoff_pose.pose.position.x = 0.0
         self.dropoff_pose.pose.position.y = 0.0
         self.dropoff_pose.pose.position.z = 0.0
         qx, qy, qz, qw = self.euler_to_quaternion(0.0, 0.0, 0.0)
-        self.dropoff_pose.pose.orientation.x = qx
-        self.dropoff_pose.pose.orientation.y = qy
-        self.dropoff_pose.pose.orientation.z = qz
-        self.dropoff_pose.pose.orientation.w = qw
+        self.dropoff_pose.pose.orientation.x = float(qx)
+        self.dropoff_pose.pose.orientation.y = float(qy)
+        self.dropoff_pose.pose.orientation.z = float(qz)
+        self.dropoff_pose.pose.orientation.w = float(qw)
 
         self.robot_state = self.STATE_FIND_BOTTLE
 
@@ -159,6 +173,7 @@ class TrashBot:
     is not empty anymore)
     '''
     def find_bottle(self):
+        
         print("Finding Bottle")
         self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes',
                                         BoundingBoxes, self.find_bottle_callback)
@@ -184,6 +199,7 @@ class TrashBot:
     Callback function for finding bottle whenever a new bounding box is published
     '''
     def find_bottle_callback(self, data):
+        
         boxes = data.bounding_boxes
         box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
 
@@ -201,6 +217,7 @@ class TrashBot:
     be picked up
     '''
     def navigate_bottle(self):
+                
         print("Navigating to Bottle")
         self.box_sub = rospy.Subscriber('/object_tracker/bounding_box',
                                         BoundingBox, self.navigate_bottle_callback)
@@ -218,6 +235,7 @@ class TrashBot:
     by the object_tracker
     '''
     def navigate_bottle_callback(self, data):
+        
         #boxes = data.bounding_boxes
         #box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
         box = data
@@ -254,6 +272,7 @@ class TrashBot:
     Pickup a bottle
     '''
     def pickup_bottle(self):
+        
         print("Picking Up Bottle")
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
@@ -272,6 +291,7 @@ class TrashBot:
     Navigate to the dropoff location
     '''
     def navigate_dropoff(self):
+        
         self.goal_simple_pub.publish(self.dropoff_pose)
         print("Published Goal, ID = ", self.dropoff_pose.header.frame_id)
         self.goal_reached_sub = rospy.Subscriber('/rtabmap/goal_reached', Bool, self.navigate_dropoff_callback)
@@ -285,6 +305,7 @@ class TrashBot:
     Callback function for navigating to dropoff location, checks if goal reached
     '''
     def navigate_dropoff_callback(self, data):
+        
         if data == True:
             self.robot_state = STATE_DROPOFF_BOTTLE
 
@@ -293,6 +314,7 @@ class TrashBot:
     Drop off a bottle
     '''
     def dropoff_bottle(self):
+        
         print("Letting Go of Bottle")
         self.state_pub.publish(self.robot_state)
         self.set_vel(0.0, 0.0)
@@ -324,15 +346,18 @@ class TrashBot:
         while not rospy.is_shutdown():
             self.state_pub.publish(self.robot_state)
 
+
     '''
     Set turn velocity and forward velocity (i.e. Z Gyro and X Velocity in Twist msg)
     '''
     def set_vel(self, turn, forward):
+        
         self.vel.angular.z = turn
         self.vel.linear.x = forward
 
 
 if __name__ == '__main__':
+    
     try:
         bot = TrashBot()
 
