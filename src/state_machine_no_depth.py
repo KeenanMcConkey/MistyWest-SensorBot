@@ -29,7 +29,7 @@ class TrashBot:
     ### CLASS CONSTANTS ###
     
     # Camera
-    GRAB_SIZE_THRESHOLD = 250.0
+    GRAB_SIZE_THRESHOLD = 125.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     IMAGE_HALF_WIDTH = 320.0
@@ -41,7 +41,7 @@ class TrashBot:
 
     # Motor control
     FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 0.25
+    FORWARD_SPEED = 0.0 #0.25
     BACKWARD_SPEED = -0.25
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.0
@@ -58,8 +58,8 @@ class TrashBot:
     SET_DROPOFF_DELAY = 1.0
 
     # Claw angles
-    ARM_DOWN_ANGLE = 95.0
-    ARM_UP_ANGLE = 80.0
+    ARM_DOWN_ANGLE = 115.0
+    ARM_UP_ANGLE = 100.0
     CLAW_CLOSED_ANGLE = 40.0
     CLAW_OPEN_ANGLE = 80.0
 
@@ -150,7 +150,7 @@ class TrashBot:
         self.set_vel(0.0, 0.0)
         self.vel_pub.publish(self.vel)
         self.state_pub.publish(self.robot_state)
-        time.sleep(SET_DROPOFF_DELAY)
+        time.sleep(self.SET_DROPOFF_DELAY)
 
         # Set at dropoff for now
         self.dropoff_pose = PoseStamped()
