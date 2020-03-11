@@ -29,6 +29,7 @@ class TrashBot:
     # Class constants
     FORWARD_THRESHOLD = 0.18
     FORWARD_SPEED = 0.25
+    BACKWARD_SPEED = -0.25
     GRAB_SIZE_THRESHOLD = 250.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
@@ -44,6 +45,8 @@ class TrashBot:
     QUEUE_SIZE = 10
     CLAW_DELAY = 0.5
     TURN_DELAY = 0.08
+    REVERSE_DELAY = 0.5
+    TURNAROUND_DELAY = 1.0
     STARTUP_TRACKER_DELAY = 0.5
     STARTUP_DROPOFF_DELAY = 1.0
     ARM_DOWN_ANGLE = 95.0
@@ -82,6 +85,7 @@ class TrashBot:
         self.depth_image_sub = message_filters.Subscriber('/camera/depth/image_rect_raw', Image)
         self.box_sub = message_filters.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes)
         self.goal_reached_sub = message_filters.Subscriber('/rtabmap/goal_reached', Bool)
+        self.robot_pose_sub = message_filters.Subscriber('/robot_pose', Pose)
 
         # Initially set dropoff
         self.robot_state = self.STATE_SET_DROPOFF
@@ -138,7 +142,7 @@ class TrashBot:
         # Set at dropoff for now
         self.dropoff_pose = PoseStamped()
         self.dropoff_pose.header.stamp = rospy.Time.now()
-        self.dropoff_pose.header.frame_id = "map"
+        self.dropoff_pose.header.frame_id = "_dropoff_"
         self.dropoff_pose.pose.position.x = 0.0
         self.dropoff_pose.pose.position.y = 0.0
         self.dropoff_pose.pose.position.z = 0.0
@@ -258,6 +262,8 @@ class TrashBot:
         self.claw_pub.publish(self.CLAW_CLOSED_ANGLE)
         time.sleep(self.CLAW_DELAY)
         self.arm_pub.publish(self.ARM_UP_ANGLE)
+        time.sleep(self.CLAW_DELAY)
+
         time.sleep(self.STARTUP_DROPOFF_DELAY)
         self.robot_state = self.STATE_NAV_DROPOFF
 
@@ -295,8 +301,28 @@ class TrashBot:
         self.arm_pub.publish(self.ARM_DOWN_ANGLE)
         time.sleep(self.CLAW_DELAY)
         self.claw_pub.publish(self.CLAW_OPEN_ANGLE)
-        self.robot_state = self.STATE_STOP
+        time.sleep(self.CLAW_DELAY)
 
+
+        print("Reversing Direction")
+        curr_pose = rospy.wait_for_message(robot_pose_sub, 'Pose')
+        self.set_vel(0.0, BACKWARD_SPEED)
+        time.sleep(self.REVERSE_DELAY)
+        qx = curr_pose.orientation.x
+        qy = curr_pose.orientation.y
+        qz = curr_pose.orientation.z
+        qw = curr_pose.orientation.w
+        curr_pose.orientation.x = -qw
+        curr_pose.orientation.y = qz
+        curr_pose.orientation.z = -qy
+        curr_pose.orientation.w = qx
+        self.goal_simple_pub.publish(self.dropoff_pose)
+        time.sleep(TURNAROUND_DELAY)
+
+        print("Finished All States: Stopping Robot")
+        self.robot_state = self.STATE_STOP
+        while not rospy.is_shutdown():
+            self.state_pub.publish(self.robot_state)
 
     '''
     Set turn velocity and forward velocity (i.e. Z Gyro and X Velocity in Twist msg)
