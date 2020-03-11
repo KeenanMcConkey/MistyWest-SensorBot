@@ -33,7 +33,9 @@ def euler_to_quaternion(roll, pitch, yaw):
 
 if __name__=="__main__":
 
-    goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = self.QUEUE_SIZE)
+    rospy.init_node('test_post_nav_goal', anonymous=True)
+
+    goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = 10)
 
     # Set at dropoff for now
     dropoff_pose = PoseStamped()
