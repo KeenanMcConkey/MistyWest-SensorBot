@@ -54,6 +54,7 @@ orientation:
     z: 0.983146331622
     w: 0.182820378018}"""
 
+    time.sleep(1)
 
     # Set at dropoff for now
     dropoff_pose = PoseStamped()
