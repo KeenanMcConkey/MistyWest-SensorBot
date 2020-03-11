@@ -37,8 +37,27 @@ if __name__=="__main__":
 
     goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = 10)
 
+    l = """{header: 
+seq: 0
+stamp: 
+    secs: 1583892632
+    nsecs: 339109681
+frame_id: "map"
+pose: 
+position: 
+    x: -0.00680875778198
+    y: -0.061126768589
+    z: 0.0
+orientation: 
+    x: 0.0
+    y: 0.0
+    z: 0.983146331622
+    w: 0.182820378018}"""
+
+
     # Set at dropoff for now
     dropoff_pose = PoseStamped()
+    dropoff_pose.header.seq = 0
     dropoff_pose.header.stamp = rospy.Time.now()
     dropoff_pose.header.frame_id = "map"
     dropoff_pose.pose.position.x = 0.0
