@@ -29,10 +29,13 @@ class TrashBot:
     ### CLASS CONSTANTS ###
 
     # Camera
-    GRAB_SIZE_THRESHOLD = 125.0
+    GRAB_YPOS_THRESHOLD = 0.31
+    GRAB_HEIGHT_THRESHOLD = 120    
+    #GRAB_SIZE_THRESHOLD = 125.0
     IMAGE_HEIGHT = 480.0
     IMAGE_WIDTH = 640.0
     IMAGE_HALF_WIDTH = 320.0
+    IMAGE_HALF_HEIGHT = 240.0 
 
     # Publish/subscribe
     VEL_PUBLISH_RATE = 10.0 #7.0
@@ -40,12 +43,13 @@ class TrashBot:
     QUEUE_SIZE = 10
 
     # Motor control
-    FORWARD_THRESHOLD = 0.18
-    FORWARD_SPEED = 0.0 #0.25
-    BACKWARD_SPEED = -0.25
+    FORWARD_THRESHOLD = 0.15
+    FORWARD_SPEED = 0.2
+    TURN_FORWARD_SPEED = 0.1
+    BACKWARD_SPEED = -0.2
     PROPORTIONAL = 2.0
     MINIUMUM_TURN = 1.0
-    FIND_TURN = 0.5
+    FIND_TURN = 0.6
     QUEUE_SIZE = 10
 
     # Delays
@@ -58,9 +62,10 @@ class TrashBot:
     SET_DROPOFF_DELAY = 1.0
 
     # Claw angles
+    ARM_START_ANGLE = 80.0
     ARM_DOWN_ANGLE = 115.0
     ARM_UP_ANGLE = 100.0
-    CLAW_CLOSED_ANGLE = 40.0
+    CLAW_CLOSED_ANGLE = 30.0
     CLAW_OPEN_ANGLE = 80.0
 
     # Robot states
@@ -81,8 +86,8 @@ class TrashBot:
         # Published topics
         self.goal_simple_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size = self.QUEUE_SIZE)
         self.vel_pub = rospy.Publisher("/intermediate_vel", Twist, queue_size = self.QUEUE_SIZE)
-        self.claw_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
-        self.arm_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
+        self.claw_pub = rospy.Publisher("/servo2", UInt16, queue_size = self.QUEUE_SIZE)
+        self.arm_pub = rospy.Publisher("/servo1", UInt16, queue_size = self.QUEUE_SIZE)
         self.state_pub = rospy.Publisher("/robot_state", Int8, queue_size = self.QUEUE_SIZE)
         #self.tracker_flag = rospy.Publisher("/tracker_flag", Bool, queue_size = self.QUEUE_SIZE)
 
@@ -102,6 +107,8 @@ class TrashBot:
 
         # Set initial servo positions
         self.claw_pub.publish(self.CLAW_OPEN_ANGLE)
+        self.arm_pub.publish(self.ARM_START_ANGLE)
+        time.sleep(0.5)
         self.arm_pub.publish(self.ARM_DOWN_ANGLE)
 
         # Velocity message, sent to /cmd_vel at VEL_PUBLISH_RATE
@@ -156,7 +163,7 @@ class TrashBot:
         self.dropoff_pose = PoseStamped()
         self.dropoff_pose.header.seq = 0
         self.dropoff_pose.header.stamp = rospy.Time.now()
-        self.dropoff_pose.header.frame_id = "_dropoff_"
+        self.dropoff_pose.header.frame_id = "map"
         self.dropoff_pose.pose.position.x = 0.0
         self.dropoff_pose.pose.position.y = 0.0
         self.dropoff_pose.pose.position.z = 0.0
@@ -219,8 +226,8 @@ class TrashBot:
     def navigate_bottle(self):
 
         print("Navigating to Bottle")
-        self.box_sub = rospy.Subscriber('/object_tracker/bounding_box',
-                                        BoundingBox, self.navigate_bottle_callback)
+        self.box_sub = rospy.Subscriber('/object_tracker/bounding_boxes',
+                                        BoundingBoxes, self.navigate_bottle_callback)
         #self.box_sub = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, self.navigate_bottle_callback)
 
         while self.robot_state is self.STATE_NAV_BOTTLE and not rospy.is_shutdown():
@@ -236,25 +243,27 @@ class TrashBot:
     '''
     def navigate_bottle_callback(self, data):
 
-        #boxes = data.bounding_boxes
-        #box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
-        box = data
+        boxes = data.bounding_boxes
+        box = next(iter(list(filter(lambda x : x.Class == "bottle", boxes))), None)
+        # box = data
 
-        #if box != None:
-        if True:
-            # Navigate to first bottle seen
-            # Determine size of bottle
-            size = box.xmax - box.xmin + 1
-            print("Bottle Size = {}".format(size))
-            if size > self.GRAB_SIZE_THRESHOLD:
-                self.robot_state = self.STATE_PICKUP_BOTTLE
-                return
+        if box != None:
+        #if True:
+            size_x = box.xmax - box.xmin + 1
+            size_y = box.ymax - box.ymin + 1
 
             # Determine bottle position relative to 0, in range [-1, 1], scaled by xpos
-            xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size / self.IMAGE_HALF_WIDTH)
+            xpos = ((box.xmax + box.xmin) / 2.0 - self.IMAGE_HALF_WIDTH) / self.IMAGE_HALF_WIDTH * (size_x / self.IMAGE_HALF_WIDTH)
+            ypos = ((box.ymax + box.ymin) / 2.0 - self.IMAGE_HALF_HEIGHT) / self.IMAGE_HALF_HEIGHT * (size_y / self.IMAGE_HALF_HEIGHT)
+            height = box.ymax - box.ymin
             print("Bottle X Position (-1 to 1) = {}".format(xpos))
-
-            # Go forward at constant speed
+            print("Bottle Y Position = {}".format(ypos))
+            print("Bottle Height = {}".format(height))
+            
+            if ypos > self.GRAB_YPOS_THRESHOLD and height < self.GRAB_HEIGHT_THRESHOLD and abs(xpos) < self.FORWARD_THRESHOLD:
+                self.robot_state = self.STATE_PICKUP_BOTTLE
+                return
+            # Go forward at constant speed            
             if abs(xpos) < self.FORWARD_THRESHOLD:
                 #xvel = self.FORWARD_SPEED * (self.GRAB_SIZE_THRESHOLD / size) - (self.FORWARD_SPEED)
                 xvel = self.FORWARD_SPEED
@@ -283,7 +292,6 @@ class TrashBot:
         self.arm_pub.publish(self.ARM_UP_ANGLE)
         time.sleep(self.CLAW_DELAY)
 
-        time.sleep(self.STARTUP_DROPOFF_DELAY)
         self.robot_state = self.STATE_NAV_DROPOFF
 
 
@@ -291,7 +299,7 @@ class TrashBot:
     Navigate to the dropoff location
     '''
     def navigate_dropoff(self):
-
+        time.sleep(self.STARTUP_DROPOFF_DELAY)
         self.goal_simple_pub.publish(self.dropoff_pose)
         print("Published Goal, ID = ", self.dropoff_pose.header.frame_id)
         self.goal_reached_sub = rospy.Subscriber('/rtabmap/goal_reached', Bool, self.navigate_dropoff_callback)
