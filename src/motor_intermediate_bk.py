@@ -13,11 +13,11 @@ from geometry_msgs.msg import Twist
 Navigator class for trash bot
 """
 class motor_intermediate:
-    VEL_PUBLISH_RATE = 7.0 # TODO: Try changing this
-    MINIUMUM_TURN = 1.25 # TODO: Try changing this
+    VEL_PUBLISH_RATE = 7.0
+    MINIUMUM_TURN = 1.25
     MIN_SLEEP = 0.2
     QUEUE_SIZE = 10
-
+    
     def __init__(self):
         # Velocity message, sent to /cmd_vel at VEL_PUBLISH_RATE
         self.vel = Twist()
@@ -41,47 +41,47 @@ class motor_intermediate:
         self.minvel.angular.x = 0.0
         self.minvel.angular.y = 0.0
         self.minvel.angular.z = 0.0
-
+        
 
         #  Create this ROSPy node
         rospy.init_node('motor_intermediate', anonymous=True)
 
         # Published topics and publish rates
         self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = self.QUEUE_SIZE)
-        #self.vel_sub = rospy.Subscriber("/intermediate_vel", Twist, self.set_vel)
+        self.vel_sub = rospy.Subscriber("/intermediate_vel", Twist, self.set_vel)
         self.vel_rate = rospy.Rate(self.VEL_PUBLISH_RATE)
-
-
+        
+    
     def write_vel(self):
         while not rospy.is_shutdown():
-            #TODO: Try changing this condition
-            if abs(self.vel.angular.z) <= 0.3 or abs(self.vel.angular.z) >= self.MINIUMUM_TURN:
+            if abs(self.vel.angular.z) <= 0.3 or abs(self.vel.angular.z) >= self.MINIUMUM_TURN: 
                 self.vel_pub.publish(self.vel)
                 self.vel_rate.sleep()
             else:
                 self.minvel.angular.z = cmp(self.vel.angular.z,0)*self.MINIUMUM_TURN
-                self.minvel.linear.x = self.vel.linear.x
                 self.vel_pub.publish(self.minvel)
                 time.sleep(abs(self.vel.angular.z)/(self.MINIUMUM_TURN)/self.VEL_PUBLISH_RATE)
-                self.zero_vel.linear.x = self.vel.linear.x
                 self.vel_pub.publish(self.zero_vel)
-
-                # Publish only forward vel for sleep_time
                 sleep_time = (1.0-abs(self.vel.angular.z)/(self.MINIUMUM_TURN))/self.VEL_PUBLISH_RATE
                 if sleep_time < self.MIN_SLEEP:
                     sleep_time = self.MIN_SLEEP
                 time.sleep(sleep_time)
-
-                # Wait until republish
-                self.zero_vel.linear.x = 0.0
+             
                 self.vel_rate.sleep()
+    '''
+    Callback function to set turn velocity and forward velocity (i.e. Z Gyro and X Velocity in Twist msg)
+    '''
+    def set_vel(self, data):
+        self.vel.angular.z = data.angular.z
+        self.vel.linear.x = data.linear.x
 
 if __name__ == '__main__':
     try:
         controller = motor_intermediate()
-
+        
         while not rospy.is_shutdown():
             controller.write_vel()
 
     except rospy.ROSInterruptException:
+        controller.set_vel(0.0, 0.0)
         controller.vel_pub.publish(self.zero_vel)
