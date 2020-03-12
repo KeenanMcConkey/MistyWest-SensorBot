@@ -48,7 +48,7 @@ class motor_intermediate:
 
         # Published topics and publish rates
         self.vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size = self.QUEUE_SIZE)
-        #self.vel_sub = rospy.Subscriber("/intermediate_vel", Twist, self.set_vel)
+        self.vel_sub = rospy.Subscriber("/intermediate_vel", Twist, self.set_vel)
         self.vel_rate = rospy.Rate(self.VEL_PUBLISH_RATE)
 
 
