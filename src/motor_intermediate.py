@@ -14,7 +14,8 @@ Navigator class for trash bot
 """
 class motor_intermediate:
     VEL_PUBLISH_RATE = 7.0
-    MINIUMUM_TURN = 1.0
+    MINIUMUM_TURN = 1.25
+    MIN_SLEEP = 0.2
     QUEUE_SIZE = 10
     
     def __init__(self):
@@ -53,15 +54,19 @@ class motor_intermediate:
     
     def write_vel(self):
         while not rospy.is_shutdown():
-            if self.vel.linear.x == 0.0:
+            if abs(self.vel.angular.z) <= 0.3 or abs(self.vel.angular.z) >= self.MINIUMUM_TURN: 
+                self.vel_pub.publish(self.vel)
+                self.vel_rate.sleep()
+            else:
                 self.minvel.angular.z = cmp(self.vel.angular.z,0)*self.MINIUMUM_TURN
                 self.vel_pub.publish(self.minvel)
                 time.sleep(abs(self.vel.angular.z)/(self.MINIUMUM_TURN)/self.VEL_PUBLISH_RATE)
                 self.vel_pub.publish(self.zero_vel)
-                time.sleep((1.0-abs(self.vel.angular.z)/(self.MINIUMUM_TURN))/self.VEL_PUBLISH_RATE)
-                self.vel_rate.sleep()
-            else:
-                self.vel_pub.publish(self.vel)
+                sleep_time = (1.0-abs(self.vel.angular.z)/(self.MINIUMUM_TURN))/self.VEL_PUBLISH_RATE
+                if sleep_time < self.MIN_SLEEP:
+                    sleep_time = self.MIN_SLEEP
+                time.sleep(sleep_time)
+             
                 self.vel_rate.sleep()
     '''
     Callback function to set turn velocity and forward velocity (i.e. Z Gyro and X Velocity in Twist msg)

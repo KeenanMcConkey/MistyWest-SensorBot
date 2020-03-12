@@ -13,6 +13,7 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Pose
 from sensor_msgs.msg import Image
+from actionlib_msgs.msg import GoalStatusArray
 import copy
 import numpy as np
 import message_filters
@@ -29,7 +30,7 @@ class TrashBot:
     ### CLASS CONSTANTS ###
 
     # Camera
-    GRAB_YPOS_THRESHOLD = 0.31
+    GRAB_YPOS_THRESHOLD = 0.30
     GRAB_HEIGHT_THRESHOLD = 120    
     #GRAB_SIZE_THRESHOLD = 125.0
     IMAGE_HEIGHT = 480.0
@@ -43,18 +44,17 @@ class TrashBot:
     QUEUE_SIZE = 10
 
     # Motor control
-    FORWARD_THRESHOLD = 0.15
-    FORWARD_SPEED = 0.2
+    FORWARD_THRESHOLD = 0.05
+    FORWARD_SPEED = 0.12
     TURN_FORWARD_SPEED = 0.1
     BACKWARD_SPEED = -0.2
     PROPORTIONAL = 2.0
-    MINIUMUM_TURN = 1.0
-    FIND_TURN = 0.6
+    MINIUMUM_TURN = 0.55
+    FIND_TURN = 0.55
     QUEUE_SIZE = 10
 
     # Delays
     CLAW_DELAY = 0.5
-    TURN_DELAY = 0.08
     REVERSE_DELAY = 0.5
     TURNAROUND_DELAY = 1.0
     STARTUP_TRACKER_DELAY = 0.5
@@ -99,7 +99,7 @@ class TrashBot:
         self.rgb_image_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
         self.depth_image_sub = message_filters.Subscriber('/camera/depth/image_rect_raw', Image)
         self.box_sub = message_filters.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes)
-        self.goal_reached_sub = message_filters.Subscriber('/rtabmap/goal_reached', Bool)
+        self.goal_reached_sub = message_filters.Subscriber('/move_base/status', GoalStatusArray)
         self.robot_pose_sub = message_filters.Subscriber('/robot_pose', Pose)
 
         # Initially set dropoff
@@ -262,6 +262,9 @@ class TrashBot:
             
             if ypos > self.GRAB_YPOS_THRESHOLD and height < self.GRAB_HEIGHT_THRESHOLD and abs(xpos) < self.FORWARD_THRESHOLD:
                 self.robot_state = self.STATE_PICKUP_BOTTLE
+                self.set_vel(0.0, 0.0)
+                self.vel_pub.publish(self.vel)
+                time.sleep(self.CLAW_DELAY)
                 return
             # Go forward at constant speed            
             if abs(xpos) < self.FORWARD_THRESHOLD:
@@ -314,7 +317,7 @@ class TrashBot:
     '''
     def navigate_dropoff_callback(self, data):
 
-        if data == True:
+        if data.status_list.status == 3:
             self.robot_state = STATE_DROPOFF_BOTTLE
 
 
