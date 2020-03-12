@@ -76,6 +76,13 @@ class motor_intermediate:
                 self.zero_vel.linear.x = 0.0
                 self.vel_rate.sleep()
 
+    '''
+    Callback function to set turn velocity and forward velocity (i.e. Z Gyro and X Velocity in Twist msg)
+    '''
+    def set_vel(self, data):
+        self.vel.angular.z = data.angular.z
+        self.vel.linear.x = data.linear.x
+
 if __name__ == '__main__':
     try:
         controller = motor_intermediate()
